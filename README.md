@@ -1,6 +1,6 @@
 # tiny-lisp
 
-A tiny interpreter for Lisp-y language
+A tiny interpreter for Lisp-y language in C
 
 ## Installing
 

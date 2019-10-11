@@ -1,0 +1,9 @@
+Features to implement
+
+( ) Working REPL
+( ) Lex and tokenization
+( ) Support for Lambda function and HOFs
+( ) Error handling, pretty print
+( ) Unit testing and documentation
+( ) Garbage collector
+( ) Type-check?
