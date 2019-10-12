@@ -88,3 +88,41 @@ Exp mkWhileX(Exp cond, Exp body) {
 
     return expression;
 }
+
+/*=========================================================================
+ *  Functions returning values
+ *========================================================================*/
+
+Value mkNil() {
+    Value v;
+    v.type = NIL;
+    return v;
+}
+
+Value mkBoolv(bool boolv) {
+    Value v;
+    v.type = BOOLV;
+    v.u.boolv = boolv;
+    return v;
+}
+
+Value mkNum(int32_t num) {
+    Value v;
+    v.type = NUM;
+    v.u.num = num;
+    return v;
+}
+Value mkSym(Name sym) {
+    Value v;
+    v.type = SYM;
+    v.u.sym = sym;
+    return v;
+}
+
+Value mkPair(Value *car, Value *cdr) {
+    Value v;
+    v.type = PAIR;
+    v.u.pair.car = car;
+    v.u.pair.cdr = cdr;
+    return v;
+}

@@ -111,13 +111,28 @@ typedef enum ValueType {
  *=========================================================================*/
 
 typedef struct Name *Name;
-typedef struct Value *Value;
+typedef struct Value Value;
 typedef struct Exp *Exp;
 typedef struct Env *Env;
 
 // Name - Containing a string that represents a variable name
 struct Name {
     const char *s;
+};
+
+// Value - A value, containing data corresponding to each
+// type specified in ValueType enum
+struct Value {
+    ValueType type;
+    union {
+        bool boolv;
+        int32_t num;
+        Name sym;
+        struct {
+            Value *car;
+            Value *cdr;
+        } pair;
+    } u;
 };
 
 // Exp - An expression, containing data corresponding to each
@@ -140,21 +155,6 @@ struct Exp {
             Exp cond;
             Exp body;
         } whilex;
-    } u;
-};
-
-// Value - A value, containing data corresponding to each
-// type specified in ValueType enum
-struct Value {
-    ValueType type;
-    union {
-        bool boolv;
-        int32_t num;
-        Name sym;
-        struct {
-            Value *car;
-            Value *cdr;
-        } pair;
     } u;
 };
 

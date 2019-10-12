@@ -52,4 +52,20 @@ Exp mkSet(Name name, Exp exp);
 Exp mkIfx(Exp cond, Exp truex, Exp falsex);
 Exp mkWhileX(Exp cond, Exp body);
 
+/*=========================================================================
+ *  Prototypes for functions returning values
+ *  -----------------------------------------
+ *  mkNil()               => Returns Nil Value
+ *  mkBoolv(bool)         => Returns Bool Value from bool argument
+ *  mkNum(int32_t)        => Returns Num Value from uint32_t argument
+ *  mkSym(Name)           => Returns Symbold Value from Name argument
+ *  mkPair(Value, Value)  => Returns Pair Value from 2 Values argument
+ *========================================================================*/
+
+Value mkNil();
+Value mkBoolv(bool boolv);
+Value mkNum(int32_t num);
+Value mkSym(Name sym);
+Value mkPair(Value *car, Value *cdr);
+
 #endif
