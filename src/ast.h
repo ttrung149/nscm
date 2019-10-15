@@ -36,36 +36,4 @@
 #ifndef _AST_H
 #define _ASH_H
 
-/*=========================================================================
- *  Prototypes for functions returning expressions
- *  ----------------------------------------------
- *  mkLit(Value)          => Returns LITERAL expression from Value argument
- *  mkVar(Name)           => Returns VAR expression from Name argument
- *  mkSet(Name, Exp)      => Returns SET expression from Name and Exp
- *  mkIfx(Exp, Exp, Exp)  => Returns IFX expression
- *  mkWhileX(Exp, Exp);   => Returns WHILEX expression
- *========================================================================*/
-
-Exp mkLit(Value literal);
-Exp mkVar(Name var);
-Exp mkSet(Name name, Exp exp);
-Exp mkIfx(Exp cond, Exp truex, Exp falsex);
-Exp mkWhileX(Exp cond, Exp body);
-
-/*=========================================================================
- *  Prototypes for functions returning values
- *  -----------------------------------------
- *  mkNil()               => Returns Nil Value
- *  mkBoolv(bool)         => Returns Bool Value from bool argument
- *  mkNum(int32_t)        => Returns Num Value from uint32_t argument
- *  mkSym(Name)           => Returns Symbold Value from Name argument
- *  mkPair(Value, Value)  => Returns Pair Value from 2 Values argument
- *========================================================================*/
-
-Value mkNil();
-Value mkBoolv(bool boolv);
-Value mkNum(int32_t num);
-Value mkSym(Name sym);
-Value mkPair(Value *car, Value *cdr);
-
 #endif
