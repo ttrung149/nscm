@@ -23,16 +23,50 @@
 /*============================================================================
  *  Enums and constants
  *===========================================================================*/
-enum class ExpType { LIT, INT, FLOAT, SYMBOL, PROC, PRIM };
+enum class ExpType { LIT, INT, FLOAT, STRING, SYMBOL, PROC, PRIM };
 enum class PrimType { 
+    IF, WHILE, DEFINE, SET,                         // Control flow, var assign
     ADD, SUB, MUL, DIV, MOD, GT, LT, GE, LE,        // Arithmetic operations
-    IF, WHILE, DEFINE, SET,                         // Control flow
     IS_NUM, IS_SYMBOL, IS_PROC                      // Type check
 };
 enum class LitType { TRUE, FALSE, NIL };
 
-/* Forward-declartion of `Env` class */
-class Env;
+/* Forward-declartion of `Expr` class */
+class Expr;
+
+/*============================================================================
+ *  Environment class
+ *===========================================================================*/
+class Env {
+private:
+    std::unordered_map<std::string, Expr*> frame;
+    Env *tail = nullptr;
+
+public:
+    Env(std::unordered_map<std::string, Expr*> &f) {
+        for (const auto &entry : f) {
+            frame[entry.first] = entry.second;
+        }
+    };
+    Env(std::unordered_map<std::string, Expr*> &f, Env *tl) {
+        for (const auto &entry : f) {
+            frame[entry.first] = entry.second;
+        }
+        tail = tl;
+    };
+    ~Env() {};
+    void add_key_value_pair(std::string k, Expr *v) {
+        frame[k] = v;
+    };
+    Expr *find_var(std::string name) {
+        const auto itr = frame.find(name);
+        if (itr != frame.end()) return itr->second;
+        else if (itr == frame.end() && tail != nullptr) {
+            return this->tail->find_var(name);
+        }
+        else throw "Unknown identifier: '" + name + "'";
+    };
+};
 
 /*============================================================================
  *  Expression class
@@ -41,10 +75,8 @@ class Expr {
 private:
     ExpType type;
     union {
-        int64_t ival;
-        double fval;
-        std::string symbol;
-        LitType lit;
+        int64_t ival; double fval; std::string sval; LitType lit;
+        std::tuple<std::string, Expr*> sym;
         std::tuple<PrimType, std::vector<Expr*> *, Env*> prim; 
         std::tuple<Expr*, Expr*, Env*> proc;
     };
@@ -52,9 +84,13 @@ private:
 public:
     Expr(int64_t i)      { type = ExpType::INT; ival = i; };
     Expr(double f)       { type = ExpType::FLOAT; fval = f; };
-    Expr(std::string s)  { type = ExpType::SYMBOL; symbol = s; };
+    Expr(std::string s)  { type = ExpType::STRING; sval = s; };
     Expr(LitType l)      { type = ExpType::LIT; lit = l; };
 
+    Expr(std::string sym_name, Expr* sym_val) {
+        type = ExpType::SYMBOL;
+        sym = std::make_tuple(sym_name, sym_val); 
+    };
     Expr(PrimType t, std::vector<Expr*> *args, Env *env) {
         type = ExpType::PRIM;
         prim = std::make_tuple(t, args, env);
@@ -65,13 +101,37 @@ public:
     };
     ~Expr()              {};
 
-    Expr *eval_prim(Env *env);
-    Expr *eval(Env *env);
+    Expr *eval_sym(Env *e);
+    Expr *eval_proc(Env *e);
+    Expr *eval_prim(Env *e);
+    Expr *eval(Env *e);
     void print_to_console(void);
+    void free_expr(void);
 };
 
 /**
- * Evaluate primitive
+ * Evaluate symbol expressions
+ * @param e pointer to env
+ * @returns Pointer to evaluated expression 
+ */
+Expr* Expr::eval_sym(Env *e) {
+    if (type != ExpType::SYMBOL) throw "Eval failed: Not symbol type!";
+    return e->find_var(std::get<0>(sym));
+}
+
+/**
+ * Evaluate procedure expressions
+ * @param e pointer to env
+ * @returns Pointer to evaluated expression 
+ */
+Expr* Expr::eval_proc(Env *e) {
+    if (type != ExpType::PROC) throw "Eval failed: Not procedure type!";
+    (void) e;
+    return nullptr;
+}
+
+/**
+ * Evaluate primitive expressions
  * @param e pointer to env
  * @returns Pointer to evaluated expression 
  */
@@ -82,20 +142,39 @@ Expr* Expr::eval_prim(Env *e) {
     std::vector<Expr*> args = *(std::get<1>(prim));
 
     switch (prim_type) {
+        /*======================= Var assign =============================*/
+        case PrimType::DEFINE: {
+            if (args.size() != 2) throw "Invalid num args for 'define'";
+            Expr *name = args[0];
+            Expr *value = args[1]->eval(e);
+            if (name->type == ExpType::STRING) {
+                e->add_key_value_pair(name->sval, value);
+                return new Expr(name->sval, value);
+            }
+            else throw "Non-string type variable name for 'define'";
+        }
+        case PrimType::SET: {
+            if (args.size() != 2) throw "Invalid num args for 'set'";
+            Expr *name = args[0];
+            Expr *value = args[1]->eval(e);
+            if (name->type == ExpType::STRING) {
+                e->find_var(name->sval);
+                e->add_key_value_pair(name->sval, value);
+                return new Expr(name->sval, value);
+            }
+            else throw "Non-string type variable name for 'set!'";
+        }
         /*======================= Control flow ===========================*/
         /* If statement */
         case PrimType::IF: {
             if (args.size() != 3) throw "Invalid num args for 'if'";
             Expr *cond = args[0]->eval(e);
             if (cond->type == ExpType::LIT && cond->lit == LitType::TRUE) 
-                return args[1]->eval(e);
-            
+                return args[1]->eval(e);     
             if (cond->type == ExpType::INT && cond->ival > 0)
                 return args[1]->eval(e);
-
             if (cond->type == ExpType::FLOAT && cond->fval > 0.0)
                 return args[1]->eval(e);
-
             return args[2]->eval(e);
         }
         /* While statement */
@@ -184,22 +263,28 @@ Expr* Expr::eval_prim(Env *e) {
                 return new Expr(e1->ival % e2->ival);
             else throw "Invalid args type for 'modulo'";
         }
+        /*======================= Type checking ===========================*/
+
         /*======================= Invalid primative =======================*/
         default: throw "Invalid primitive'";
     }
 };
 
 /**
- * Evaluate expression
- * @param env pointer to env
+ * Evaluate expression generic function. Delegate expression evaluation to 
+ * class function handling each data type.
+ * @param e pointer to env
  * @returns Pointer to evaluated expression 
  */
-Expr* Expr::eval(Env *env) {
+Expr* Expr::eval(Env *e) {
     switch (type) {
         case ExpType::INT:     { return this; }
         case ExpType::FLOAT:   { return this; }
+        case ExpType::STRING:  { return this; }
         case ExpType::LIT:     { return this; }
-        case ExpType::PRIM:    { return eval_prim(env); }
+        case ExpType::PRIM:    { return eval_prim(e); }
+        case ExpType::PROC:    { return eval_proc(e); }
+        case ExpType::SYMBOL:  { return eval_sym(e); }
         default:               { return nullptr; }
     }
 };
@@ -213,7 +298,9 @@ void Expr::print_to_console(void) {
         case ExpType::INT:     { std::cout << ival << "\n"; break; }
         case ExpType::FLOAT:   { std::cout << fval << "\n"; break; }
         case ExpType::PROC:    { std::cout << "<procedure>\n"; break; }
-        case ExpType::PRIM:    { std::cout << "<primitive>\n"; break; }
+        case ExpType::STRING:  { std::cout << "'" << sval << "'\n"; break; }
+        case ExpType::PRIM:
+        case ExpType::SYMBOL:  { std::get<1>(sym)->print_to_console(); break; }
         case ExpType::LIT:     {
             switch (lit) {
                 case LitType::TRUE:     std::cout<< "#t\n"; break;
@@ -226,28 +313,10 @@ void Expr::print_to_console(void) {
     }
 }
 
-/*============================================================================
- *  Environment class
- *===========================================================================*/
-class Env {
-private:
-    std::unordered_map<std::string, Expr*> frame;
-    // Env *outer = nullptr;
+/* TODO: free expression when deleted */
+void Expr::free_expr(void) {
 
-public:
-    Env(Env *outer) {
-        (void) outer;
-    };
-    ~Env() {};
-    void add_key_value_pair(std::string k, Expr *v) {
-        (void) k;
-        (void) v;
-    };
-    bool find_var(std::string v) {
-        (void) v;
-        return false;
-    };
-};
+}
 
 /*============================================================================
  *  Main driver
@@ -255,21 +324,32 @@ public:
 int main(int argc, char*argv[]) {
     (void) argc;
     (void) argv;
+    std::unordered_map<std::string, Expr*> std_env_frame = {};
+    Env global_env = Env(std_env_frame);
 
-    // Expr* lit_true = new Expr(LitType::TRUE);
+    Expr* str = new Expr("hello world");
     Expr* x = new Expr(int64_t(10));
     Expr* y = new Expr(int64_t(2));
     Expr* z = new Expr(9.5);
     std::vector<Expr*> mul_args = {x, y};
-    Expr *mul_x_y = new Expr(PrimType::MUL, &mul_args, nullptr);
+    Expr *mul_x_y = new Expr(PrimType::MUL, &mul_args, &global_env);
     
     std::vector<Expr*> add_z_args = {mul_x_y, z};
-    Expr *res = new Expr(PrimType::ADD, &add_z_args, nullptr);
+    Expr *res = new Expr(PrimType::ADD, &add_z_args, &global_env);
+
+    std::vector<Expr*> define_var = {str, res};
+    Expr *def = new Expr(PrimType::SET, &define_var, &global_env);
 
     try {
-        (res->eval(nullptr))->print_to_console();
+        (res->eval(&global_env))->print_to_console();
+        (str->eval(&global_env))->print_to_console();
+        (def->eval(&global_env))->print_to_console();
     }
     catch (const char* e) {
+        std::cerr << "ERR: " << e << "\n";
+        exit(EXIT_FAILURE);
+    }
+    catch (const std::string &e) {
         std::cerr << "ERR: " << e << "\n";
         exit(EXIT_FAILURE);
     }
