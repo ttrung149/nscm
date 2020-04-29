@@ -20,97 +20,167 @@
 #include <unordered_map>
 #include <functional>
 
-/* Enums and constants */
+/*============================================================================
+ *  Enums and constatn
+ *===========================================================================*/
 enum class Type {
-    INT, FLOAT, SYMBOL, PROCEDURE, PRIMITIVE
+    INT, FLOAT, SYMBOL, PROC, PRIM
 };
 
-/* Forward-declared expression class */
-class Expr;
-
-/* Environment class */
-class Env {
-private:
-    std::unordered_map<std::string, Expr*> frame;
-    Env *outer = nullptr;
-
-public:
-    Env();
-    ~Env();
-    void add_key_value_pair(std::string k, Expr *v) {
-        (void) k;
-        (void) v;
-    };
-
-    bool find_var(std::string v) {
-        (void) v;
-        return false;
-    };
+enum class PrimType {
+    ADD, SUB, MUL, DIV
 };
 
+/* Forward-declartion of `Env` class */
+class Env;
+
+/*============================================================================
+ *  Expression class
+ *===========================================================================*/
 class Expr {
 private:
     Type type;
     union {
-        int ival;
+        int64_t ival;
         double fval;
         std::string symbol;
-        std::tuple<std::vector<Expr*>, Expr*, Env*> proc;
-        std::tuple<std::vector<Expr*>, Env*> primitive;
+        std::tuple<PrimType, std::vector<Expr*> *, Env*> prim; 
+        std::tuple<std::vector<Expr*> *, Expr*, Env*> proc;
     };
 public:
     Expr(int64_t i)      { type = Type::INT; ival = i; };
     Expr(double f)       { type = Type::FLOAT; fval = f; };
     Expr(std::string s)  { type = Type::SYMBOL; symbol = s; };
 
-    Expr(std::vector<Expr*> args, Env *env) {
-        type = Type::PRIMITIVE;
-        primitive = {args, env};
+    Expr(PrimType t, std::vector<Expr*> *args, Env *env) {
+        type = Type::PRIM;
+        prim = std::make_tuple(t, args, env);
     };
-    Expr(std::vector<Expr*> params, Expr *body, Env *env) {
-        type = Type::PROCEDURE;
-        proc = {params, body, env};
+    Expr(std::vector<Expr*> *params, Expr *body, Env *env) {
+        type = Type::PROC;
+        proc = std::make_tuple(params, body, env);
     };
     ~Expr()              {};
 
-    Expr *eval() {
-        switch (type) {
-            case Type::INT:
-                return this;
-                break;
+    Expr *eval_prim(Env *env);
+    Expr *eval(Env *env);
+    void print_to_console();
+};
 
-            case Type::FLOAT:
-                return this;
-                break;
+/**
+ * Evaluate primitive
+ * @param e pointer to env
+ * @returns Pointer to evaluated expression 
+ */
+Expr* Expr::eval_prim(Env *e) {
+    if (type != Type::PRIM) throw "Eval failed: Not primitive type!";
+    
+    PrimType prim_type = std::get<0>(prim);
+    std::vector<Expr*> args = *(std::get<1>(prim));
 
-            default:
-                return nullptr;
-                break;
+    switch (prim_type) {
+        // Integer addition
+        case PrimType::ADD: {
+            int64_t s = 0;
+            for (const auto &arg : args) {
+                s += (arg->eval(e))->ival;
+            }
+            return new Expr(s);
         }
-    };
-
-    void print_to_console() {
-        switch (type) {
-            case Type::INT:
-                std::cout << ival << "\n";
-                break;
-
-            case Type::FLOAT:
-                std::cout << fval << "\n";
-                break;
-
-            default:
-                break;
+        // Integer subtraction
+        case PrimType::SUB: {
+            if (args.size() != 2) throw "Invalid num args for '-'";
+            int64_t d = args[0]->eval(e)->ival - args[1]->eval(e)->ival;
+            return new Expr(d);
         }
+        // Integer multiplication
+        case PrimType::MUL: {
+            int64_t p = 1;
+            for (const auto &arg : args) {
+                p *= arg->eval(e)->ival;
+            }
+            return new Expr(p);
+        }
+        // Integer division
+        case PrimType::DIV: {
+            if (args.size() != 2) throw "Invalid num args for '/'";
+            int64_t den = (args[1]->eval(e))->ival;
+            if (den == 0) throw "Err: Division by zero";
+            int64_t num = (args[0]->eval(e))->ival;
+            return new Expr(num / den);
+        }
+
+        // Invalid primitive
+        default: throw "Invalid primitive'";
     }
+};
+
+Expr* Expr::eval(Env *env) {
+    switch (type) {
+        case Type::INT:     { return this; }
+        case Type::FLOAT:   { return this; }
+        case Type::PRIM:    { return eval_prim(env); }
+        default:            { return nullptr; }
+    }
+};
+
+void Expr::print_to_console() {
+    switch (type) {
+        case Type::INT:     { std::cout << ival << "\n"; break; }
+        case Type::FLOAT:   { std::cout << fval << "\n"; break; }
+        case Type::PROC:    { std::cout << "<procedure>\n"; break; }  
+        default:            break;
+    }
+}
+
+/*============================================================================
+ *  Environment class
+ *===========================================================================*/
+class Env {
+private:
+    std::unordered_map<std::string, Expr*> frame;
+    // Env *outer = nullptr;
+
+public:
+    Env(Env *outer) {
+        (void) outer;
+    };
+    ~Env() {};
+    void add_key_value_pair(std::string k, Expr *v) {
+        (void) k;
+        (void) v;
+    };
+    bool find_var(std::string v) {
+        (void) v;
+        return false;
+    };
 };
 
 int main(int argc, char*argv[]) {
     (void) argc;
     (void) argv;
 
-    std::unique_ptr<Expr> e(new Expr(int64_t(3)));
-    (e->eval())->print_to_console();
+    Expr* a = new Expr(int64_t(2));
+    Expr* b = new Expr(int64_t(5));
+    Expr* c = new Expr(int64_t(10));
+    Expr* d = new Expr(int64_t(10.5));
+    std::vector<Expr*> x = {a, b};
+
+    Expr *e = new Expr(PrimType::SUB, &x, nullptr);
+
+    try {
+        (e->eval(nullptr))->print_to_console();
+    }
+    catch (const char* e) {
+        std::cerr << "ERR: " << e << "\n";
+        exit(EXIT_FAILURE);
+    }
+
+    delete a;
+    delete b;
+    delete c;
+    delete d;
+    delete e;
 
     return 0;
 }
