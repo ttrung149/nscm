@@ -1,6 +1,6 @@
 MIT License
 
-Copyright (c) 2019 - Trung Truong
+Copyright (c) 2019-2020 - Trung Truong
 
 All rights reserved.
 

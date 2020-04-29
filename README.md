@@ -1,22 +1,14 @@
-# tiny-lisp
+# nanoscheme
 
-A tiny interpreter for Lisp-y language in C
+Tinier, C++ and Python ported version of [Norman Ramsey](https://www.cs.tufts.edu/~nr/)'s uScheme language.
 
 ## Installing
 
+Clone the repository. 
+
 ## Docs
 
-## Tests
-
 ## Examples
-
-## Special thanks
-
-Special thanks to following sources of reference:
-
-* <em>Programming Languages: Build, Prove and Compare</em> - Norman Ramsey
-
-* uScheme interpreter - Norman Ramsey's implementation of an interpreter of a Scheme-like programming language
 
 ## Authors
 
