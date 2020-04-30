@@ -40,13 +40,15 @@ class Expr;
 class Env {
 private:
     std::unordered_map<std::string, Expr*> frame;
-    Env *tail = nullptr;
+    Env *tail;
 
 public:
+    /* Constructors */
     Env(std::unordered_map<std::string, Expr*> &f) {
         for (const auto &entry : f) {
             frame[entry.first] = entry.second;
         }
+        tail = nullptr;
     };
     Env(std::unordered_map<std::string, Expr*> &f, Env *tl) {
         for (const auto &entry : f) {
@@ -54,8 +56,14 @@ public:
         }
         tail = tl;
     };
+    Env(Env *tl) {
+        frame = {};
+        tail = tl;
+    };
     ~Env() {};
-    void add_key_value_pair(std::string k, Expr *v) {
+
+    Env *get_tl() { return tail; };
+    void add_key_value_pair(std::string &k, Expr *v) {
         frame[k] = v;
     };
     Expr *find_var(std::string name) {
@@ -75,7 +83,8 @@ class Expr {
 private:
     ExpType type;
     union {
-        int64_t ival; double fval; std::string sval; LitType lit;
+        int64_t ival; double fval; std::string sval = ""; LitType lit;
+        std::vector<Expr*> *list;
         std::tuple<std::string, Expr*> sym;
         std::tuple<PrimType, std::vector<Expr*> *> prim; 
         std::tuple<Expr*, Expr*, Env*> proc;
@@ -83,12 +92,13 @@ private:
 
 public:
     /* Constructors */
-    Expr(int64_t i)      { type = ExpType::INT; ival = i; };
-    Expr(double f)       { type = ExpType::FLOAT; fval = f; };
-    Expr(std::string s)  { type = ExpType::STRING; sval = s; };
-    Expr(LitType l)      { type = ExpType::LIT; lit = l; };
+    Expr(int64_t i)             { type = ExpType::INT;      ival = i; };
+    Expr(double f)              { type = ExpType::FLOAT;    fval = f; };
+    Expr(std::string s)         { type = ExpType::STRING;   sval = s; };
+    Expr(LitType l)             { type = ExpType::LIT;      lit  = l; };
+    Expr(std::vector<Expr*> *l) { type = ExpType::LIST;     list = l; };
 
-    Expr(std::string sym_name, Expr* sym_val) {
+    Expr(std::string sym_name, Expr *sym_val) {
         type = ExpType::SYMBOL;
         sym = std::make_tuple(sym_name, sym_val); 
     };
@@ -104,9 +114,9 @@ public:
 
     /* Evaluators */
     Expr *eval_sym(Env *e);
-    Expr *eval_proc(std::vector<Expr*> *bind, Env *e);
+    Expr *eval_proc(std::vector<Expr*> *bindings);
     Expr *eval_prim(Env *e);
-    Expr *eval(std::vector<Expr*> *bind,Env *e);
+    Expr *eval(std::vector<Expr*> *bindings, Env *e);
 
     /* IO */
     void print_to_console(void);
@@ -125,15 +135,28 @@ Expr* Expr::eval_sym(Env *e) {
 
 /**
  * Evaluate procedure expressions
- * @param bind pointer to vector containing argument bindings
- * @param e pointer to env
+ * @param bindings pointer to vector containing argument bindings
  * @returns Pointer to evaluated expression 
  */
-Expr* Expr::eval_proc(std::vector<Expr*> *bind, Env *e) {
+Expr* Expr::eval_proc(std::vector<Expr*> *bindings) {
     if (type != ExpType::PROC) throw "Eval failed: Not procedure type!";
-    (void) bind;
-    (void) e;
-    return nullptr;
+    Expr *params = std::get<0>(proc);
+    Expr *body = std::get<1>(proc);
+    Env *e = std::get<2>(proc);
+
+    Env *new_env = new Env(e->get_tl());
+    if (bindings->size() != params->list->size()) 
+        throw "Number of args does not match!";
+    
+    int arg_index = 0;
+    for (const auto &param : *params->list) {
+        if (param->type != ExpType::STRING) throw "Non-string typed argument";
+        Expr *value = bindings->at(arg_index)->eval(nullptr, e);
+        new_env->add_key_value_pair(param->sval, value);
+        arg_index++;
+    }
+
+    return body->eval(nullptr, new_env);
 }
 
 /**
@@ -173,6 +196,7 @@ Expr* Expr::eval_prim(Env *e) {
         /*======================= Lambda exp =============================*/
         case PrimType::LAMBDA: {
             if (args.size() != 2) throw "Invalid num args for 'lambda'";
+            if (args[0]->type != ExpType::LIST) throw "Non list typed args";
             return new Expr(args[0], args[1], e);
         }
         /*======================= Control flow ===========================*/
@@ -284,11 +308,11 @@ Expr* Expr::eval_prim(Env *e) {
 /**
  * Evaluate expression generic function. Delegate expression evaluation to 
  * class function handling each data type.
- * @param bind pointer to vector containing argument bindings
+ * @param bindings pointer to vector containing argument bindings
  * @param e pointer to env
  * @returns Pointer to evaluated expression 
  */
-Expr* Expr::eval(std::vector<Expr*> *bind, Env *e) {
+Expr* Expr::eval(std::vector<Expr*> *bindings, Env *e) {
     switch (type) {
         case ExpType::INT:      return this;
         case ExpType::FLOAT:    return this;
@@ -296,7 +320,7 @@ Expr* Expr::eval(std::vector<Expr*> *bind, Env *e) {
         case ExpType::LIT:      return this;
         case ExpType::PRIM:     return eval_prim(e);
         case ExpType::SYMBOL:   return eval_sym(e);
-        case ExpType::PROC:     return eval_proc(bind, e);
+        case ExpType::PROC:     return eval_proc(bindings);
         default:                return nullptr;
     }
 };
@@ -307,19 +331,28 @@ Expr* Expr::eval(std::vector<Expr*> *bind, Env *e) {
  */
 void Expr::print_to_console(void) {
     switch (type) {
-        case ExpType::INT:     { std::cout << ival << "\n";         break; }
-        case ExpType::FLOAT:   { std::cout << fval << "\n";         break; }
-        case ExpType::PROC:    { std::cout << "<procedure>\n";      break; }
-        case ExpType::STRING:  { std::cout << "'" << sval << "'\n"; break; }
+        case ExpType::INT:     { std::cout << ival;               break; }
+        case ExpType::FLOAT:   { std::cout << fval;               break; }
+        case ExpType::PROC:    { std::cout << "<procedure>";      break; }
+        case ExpType::STRING:  { std::cout << "'" << sval << "'"; break; }
         case ExpType::PRIM:
         case ExpType::SYMBOL:  { std::get<1>(sym)->print_to_console(); break; }
         case ExpType::LIT:     {
             switch (lit) {
-                case LitType::TRUE:     std::cout<< "#t\n"; break;
-                case LitType::FALSE:    std::cout<< "#f\n"; break;
-                case LitType::NIL:      std::cout<< "()\n"; break;
+                case LitType::TRUE:     std::cout<< "#t"; break;
+                case LitType::FALSE:    std::cout<< "#f"; break;
+                case LitType::NIL:      std::cout<< "()"; break;
                 default: break;
             }
+        }
+        case ExpType::LIST:     {
+            std::cout << "( ";
+            for (const auto &elem : *list) {
+                elem->print_to_console(); 
+                std::cout << " ";
+            }
+            std::cout << ")";
+            break;
         }
         default:               break;
     }
@@ -327,7 +360,6 @@ void Expr::print_to_console(void) {
 
 /* TODO: free expression when deleted */
 void Expr::free_expr(void) {
-
 }
 
 /*============================================================================
@@ -346,14 +378,18 @@ int main(int argc, char*argv[]) {
     std::unordered_map<std::string, Expr*> std_env_frame = {};
     Env global_env = Env(std_env_frame);
 
-    Expr* str = new Expr("hello world");
+    Expr* str = new Expr(std::string("hello"));
     Expr* x = new Expr(int64_t(10));
     Expr* y = new Expr(int64_t(2));
-    Expr* z = new Expr(9.5);
-    std::vector<Expr*> mul_args = {x, y};
-    Expr *mul_x_y = new Expr(PrimType::MUL, &mul_args);
+    Expr* z = new Expr(int64_t(29));
+
+    std::vector<Expr *> list = {x, y, z};
+    Expr *li = new Expr(&list);
+
+    std::vector<Expr*> mul_args = {x, x};
+    Expr *mul_x_x = new Expr(PrimType::MUL, &mul_args);
     
-    std::vector<Expr*> add_z_args = {mul_x_y, z};
+    std::vector<Expr*> add_z_args = {mul_x_x, z};
     Expr *res = new Expr(PrimType::ADD, &add_z_args);
 
     std::vector<Expr*> define_var = {str, res};
@@ -362,11 +398,20 @@ int main(int argc, char*argv[]) {
     std::vector<Expr*> set_var = {str, x};
     Expr *set = new Expr(PrimType::SET, &set_var);
 
+    std::vector<Expr*> args = {str};
+    Expr *a = new Expr(&args);
+    std::vector<Expr*> lambda_square = {a, mul_x_x};
+    Expr *sqr = new Expr(PrimType::LAMBDA, &lambda_square);
+    std::vector<Expr*> bindings = {x};
+    
     try {
-        (res->eval(nullptr, &global_env))->print_to_console();
-        (str->eval(nullptr, &global_env))->print_to_console();
-        (def->eval(nullptr, &global_env))->print_to_console();
-        (set->eval(nullptr, &global_env))->print_to_console();
+        li->print_to_console(); std::cout << "\n";
+        res->eval(nullptr, &global_env)->print_to_console(); std::cout << "\n";
+        str->eval(nullptr, &global_env)->print_to_console(); std::cout << "\n";
+        def->eval(nullptr, &global_env)->print_to_console(); std::cout << "\n"; 
+        set->eval(nullptr, &global_env)->print_to_console(); std::cout << "\n";
+        sqr->eval(nullptr, &global_env)->eval(&bindings, &global_env)->print_to_console();
+        std::cout << "\n";
     }
     catch (const char* e) {
         std::cerr << "ERR: " << e << "\n";
@@ -380,7 +425,7 @@ int main(int argc, char*argv[]) {
     delete x;
     delete y;
     delete z;
-    delete mul_x_y;
+    delete mul_x_x;
     delete res;
 
     return 0;
