@@ -68,8 +68,7 @@ public:
     };
     Expr *find_var_in_frame(std::string name) {
         const auto itr = frame.find(name);
-        if (itr != frame.end()) return itr->second;
-        else return nullptr;
+        if (itr != frame.end()) return itr->second; else return nullptr;
     }
 };
 
@@ -89,24 +88,18 @@ private:
 
 public:
     /* Constructors */
-    Expr(int64_t i)             { type = ExpType::INT;      ival = i; };
-    Expr(double f)              { type = ExpType::FLOAT;    fval = f; };
-    Expr(std::string s)         { type = ExpType::STRING;   sval = s; };
-    Expr(LitType l)             { type = ExpType::LIT;      lit  = l; };
-    Expr(std::vector<Expr*> *l) { type = ExpType::LIST;     list = l; };
+    Expr(int64_t i)             : type(ExpType::INT),    ival(i) {};
+    Expr(double f)              : type(ExpType::FLOAT),  fval(f) {};
+    Expr(std::string s)         : type(ExpType::STRING), sval(s) {};
+    Expr(LitType l)             : type(ExpType::LIT),    lit(l)  {};
+    Expr(std::vector<Expr*> *l) : type(ExpType::LIST),   list(l) {};
 
-    Expr(std::string sym_name, Expr *sym_val) {
-        type = ExpType::SYMBOL;
-        sym = std::make_tuple(sym_name, sym_val); 
-    };
-    Expr(PrimType t, std::vector<Expr*> *args) {
-        type = ExpType::PRIM;
-        prim = std::make_tuple(t, args);
-    };
-    Expr(Expr *params, Expr *body, Env *env) {
-        type = ExpType::PROC;
-        proc = std::make_tuple(params, body, env);
-    };
+    Expr(std::string sym_name, Expr *sym_val)
+        : type(ExpType::SYMBOL), sym(std::make_tuple(sym_name, sym_val)) {}; 
+    Expr(PrimType t, std::vector<Expr*> *args) 
+        : type(ExpType::PRIM), prim(std::make_tuple(t, args)) {};
+    Expr(Expr *params, Expr *body, Env *env)
+        : type(ExpType::PROC), proc(std::make_tuple(params, body, env)) {};
     ~Expr() {};
 
     /* Copy constructor */
@@ -177,8 +170,7 @@ Expr Expr::eval_proc(std::vector<Expr*> *bindings) {
  * @returns evaluated expression 
  */
 Expr Expr::eval_prim(Env *e) {
-    if (type != ExpType::PRIM) throw "Eval failed: Not primitive type!";
-    
+    if (type != ExpType::PRIM) throw "Eval failed: Not primitive type!"; 
     PrimType prim_type = std::get<0>(prim);
     std::vector<Expr*> args = *std::get<1>(prim);
 
@@ -213,7 +205,7 @@ Expr Expr::eval_prim(Env *e) {
         /*======================= Lambda exp =============================*/
         case PrimType::LAMBDA: {
             if (args.size() != 2) throw "Invalid num args for 'lambda'";
-            if (args[0]->type != ExpType::LIST) throw "Non list typed args";
+            if (args[0]->type != ExpType::LIST) throw "Non-list typed args";
             return Expr(args[0], args[1], e);
         }
         /*======================= Control flow ===========================*/
@@ -323,8 +315,8 @@ Expr Expr::eval_prim(Env *e) {
 };
 
 /**
- * Evaluate expression generic function. Delegate expression evaluation to 
- * class function handling each data type.
+ * Evaluate generic expression. Delegate evaluation to data-type specific 
+ * eval function.
  * @param bindings pointer to vector containing argument bindings
  * @param e pointer to env
  * @returns evaluated expression 
@@ -334,6 +326,7 @@ Expr Expr::eval(std::vector<Expr*> *bindings, Env *e) {
         case ExpType::INT:      return Expr(this->ival);
         case ExpType::FLOAT:    return Expr(this->fval);
         case ExpType::STRING:   return Expr(this->sval);
+        case ExpType::LIST:     return Expr(this->list);
         case ExpType::LIT:      return Expr(this->lit) ;
         case ExpType::PRIM:     return eval_prim(e);
         case ExpType::SYMBOL:   return eval_sym(e);
