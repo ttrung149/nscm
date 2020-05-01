@@ -369,20 +369,14 @@ void Expr::print_to_console(void) {
 /*============================================================================
  *  Parser implementation
  *===========================================================================*/
-struct AST_node { 
-    Expr *expr; 
-    Env *env; 
-    AST_node *left; AST_node *right; 
-    AST_node(Expr *exp, Env *e, AST_node *l, AST_node *r) 
-        : expr(exp), env(e), left(l), right(r) {};     
-};
-
-AST_node *tokenize(std::string &in, Env *env) {
-    (void) in;
-    (void) env;
-    return nullptr;
-}
-
+/**
+ * Find the closest word in the string before encountering a space
+ * or a new line character
+ * @param expr String of expression
+ * @param parse Reference to parsed string
+ * @returns The next position on the expression string from where the parsed
+ * string ends
+ */
 static size_t read_til_space(std::string expr, std::string &parsed) {
     size_t idx = 0;
     std::string curr_str = "";
@@ -397,6 +391,15 @@ static size_t read_til_space(std::string expr, std::string &parsed) {
     return idx;
 }
 
+/**
+ * Find the closest expression in the string before encountering a matching
+ * bracket. For every '(', there must be a matching ')' in argument string,
+ * else an Exception is thrown.
+ * @param expr String of expression
+ * @param parse Reference to parsed string
+ * @returns The next position on the expression string from where the parsed
+ * string ends
+ */
 static size_t read_til_end_bracket(std::string expr, std::string &parsed) {
     size_t idx = expr.find('(');
     if (idx == std::string::npos) throw "Missing '('";
@@ -410,12 +413,17 @@ static size_t read_til_end_bracket(std::string expr, std::string &parsed) {
         else                       { curr_str += expr[idx]; }
         idx++;
     }
-
     if (bracket_stack != 0) throw "Unmatching brackets \n>>> '" + expr + "'";
     parsed = curr_str;
     return idx;
 }
 
+/**
+ * Parses expression from a given input string
+ * @param expr String of expression - format: `(<op> <args1> <args2> ..)`
+ * @returns A vector containing all parsed expression string from input.
+ * Exception is thrown if input string cannot be parsed (syntax error)
+ */
 std::vector<std::string> parse_expr(std::string expr) {
     size_t expr_len = expr.size();
     if (expr_len == 0) 
@@ -444,6 +452,36 @@ std::vector<std::string> parse_expr(std::string expr) {
         }
     }
     return res;
+}
+
+/*============================================================================
+ *  Abstract Syntax Tree (AST) implementation
+ *===========================================================================*/
+struct AST_node { 
+    Expr *expr; 
+    Env *env; 
+    AST_node *left; AST_node *right; 
+    AST_node(Expr *exp, Env *e, AST_node *l, AST_node *r) 
+        : expr(exp), env(e), left(l), right(r) {};     
+};
+
+/**
+ * Recursively generates AST based on input string
+ * @param expr String of expressions
+ * @param env Pointer to Env
+ * @returns Pointer to root AST node
+ */
+AST_node *tokenize(std::string expr, Env *env) {
+    (void) env;
+    std::vector<std::string> tokens = parse_expr(expr);
+    for (auto &token : tokens) {
+        if (token[0] == '(' && token[token.size()-1] == ')') {
+            tokenize(token, env);
+        }
+        else std::cout << token << "\n";
+    }
+
+    return nullptr;
 }
 /*============================================================================
  *  Main driver
@@ -486,10 +524,7 @@ int main(int argc, char*argv[]) {
     }
 
     try {
-        std::vector<std::string> v = parse_expr("(define x (lambda (x) (* x x))");
-        for (auto &e : v) {
-            std::cout << "expr: " << e << "\n";
-        }
+        tokenize("(define x (lambda (x) (* x y)))", nullptr);
     }
     catch (const char* e) {
         std::cerr << "ERR: " << e << "\n";
