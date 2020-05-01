@@ -9,7 +9,6 @@
  * 
  *==========================================================================*/
 #include <iostream>
-#include <memory>
 #include <fstream>
 #include <string>
 #include <vector>
@@ -370,7 +369,82 @@ void Expr::print_to_console(void) {
 /*============================================================================
  *  Parser implementation
  *===========================================================================*/
+struct AST_node { 
+    Expr *expr; 
+    Env *env; 
+    AST_node *left; AST_node *right; 
+    AST_node(Expr *exp, Env *e, AST_node *l, AST_node *r) 
+        : expr(exp), env(e), left(l), right(r) {};     
+};
 
+AST_node *tokenize(std::string &in, Env *env) {
+    (void) in;
+    (void) env;
+    return nullptr;
+}
+
+static size_t read_til_space(std::string expr, std::string &parsed) {
+    size_t idx = 0;
+    std::string curr_str = "";
+
+    while (idx < expr.size()) {
+        if (expr[idx] == ' ' || expr[idx] == '\n' || expr[idx] == ')') 
+            break;
+        else curr_str += expr[idx];
+        idx++;
+    }
+    parsed = curr_str;
+    return idx;
+}
+
+static size_t read_til_end_bracket(std::string expr, std::string &parsed) {
+    size_t idx = expr.find('(');
+    if (idx == std::string::npos) throw "Missing '('";
+    std::string curr_str = "(";
+    int bracket_stack = 1;
+    idx++;
+
+    while (bracket_stack != 0 && idx < expr.size()) {
+        if (expr[idx] == '(')      { bracket_stack++; curr_str += expr[idx]; }
+        else if (expr[idx] == ')') { bracket_stack--; curr_str += expr[idx]; }
+        else                       { curr_str += expr[idx]; }
+        idx++;
+    }
+
+    if (bracket_stack != 0) throw "Unmatching brackets \n>>> '" + expr + "'";
+    parsed = curr_str;
+    return idx;
+}
+
+std::vector<std::string> parse_expr(std::string expr) {
+    size_t expr_len = expr.size();
+    if (expr_len == 0) 
+        throw "Unable to parse empty string";
+    if (expr[0] != '(' || expr[expr_len-1] != ')')
+        throw "Unmatching brackets \n>>> '" + expr + "'";
+
+    size_t idx = 1;
+    std::vector<std::string> res;
+
+    while (idx < expr_len - 1) {
+        if (expr[idx] == '(') {
+            std::string parsed = "";
+            int cursor = idx;
+            idx += read_til_end_bracket(expr.substr(cursor), parsed);
+            res.push_back(parsed);
+        }
+        else if (expr[idx] == ' ' || expr[idx] == '\n') {
+            idx++;
+        }
+        else {
+            std::string parsed = "";
+            int cursor = idx;
+            idx += read_til_space(expr.substr(cursor), parsed);
+            res.push_back(parsed);
+        }
+    }
+    return res;
+}
 /*============================================================================
  *  Main driver
  *===========================================================================*/
@@ -401,6 +475,21 @@ int main(int argc, char*argv[]) {
                 .eval(&bindings, &global_env)
                 .print_to_console();
         std::cout << "\n";
+    }
+    catch (const char* e) {
+        std::cerr << "ERR: " << e << "\n";
+        exit(EXIT_FAILURE);
+    }
+    catch (const std::string &e) {
+        std::cerr << "ERR: " << e << "\n";
+        exit(EXIT_FAILURE);
+    }
+
+    try {
+        std::vector<std::string> v = parse_expr("(define x (lambda (x) (* x x))");
+        for (auto &e : v) {
+            std::cout << "expr: " << e << "\n";
+        }
     }
     catch (const char* e) {
         std::cerr << "ERR: " << e << "\n";
