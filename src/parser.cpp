@@ -8,6 +8,21 @@
  *==========================================================================*/
 #include "expr.h"
 
+/* Parsing table */
+const std::unordered_map<std::string, PrimType> token_table {
+    { "+"       , PrimType::ADD    },  { "-"         , PrimType::SUB     },
+    { "*"       , PrimType::MUL    },
+    { "/"       , PrimType::DIV    },  { ">"         , PrimType::GT      },
+    { "<"       , PrimType::LT     },  { "mod"       , PrimType::MOD     },
+    { ">="      , PrimType::GE     },  { "<="        , PrimType::LE      },
+    { "car"     , PrimType::CAR    },  { "cdr"       , PrimType::CDR     }, 
+    { "CONS"    , PrimType::CONS   },  { "lambda"    , PrimType::LAMBDA  },
+    { "define"  , PrimType::DEFINE },  { "set"       , PrimType::SET     },
+    { "number?" , PrimType::IS_NUM },  { "procedure?", PrimType::IS_PROC },
+    { "symbol?" , PrimType::IS_SYM },  { "list?"     , PrimType::IS_LIST },
+    { "if"      , PrimType::IF     },  { "while"     , PrimType::WHILE   }
+};
+
 /**
  * Check if string is int. If string is int, parse the string
  * @param expr String of expression
@@ -130,24 +145,121 @@ std::vector<std::string> parse_expr(std::string expr) {
 /* Forward declare build_AST funtion */
 Expr *build_AST(std::string expr, Env *env);
 
+/**
+ * Helper function - generate number/string/literal/symbol expression 
+ * @param expr Input expression string
+ * @returns Pointer to allocated number/string/literal/symbol expression
+ */
 static Expr *make_const(std::string expr) {
+    /* string expression */
+    if (expr.size() > 1 && expr[0] == '"' && expr[expr.size()-1] == '"')
+        return new Expr(expr);
+    
     auto tokens = parse_expr("(" + expr + ")");
     if (tokens.size() != 1) throw "Invalid syntax at \n>>> " + expr;
-
     int64_t parsed_int;
     double parsed_float;
 
-    if (expr.size() > 1 && expr[0] == '"' && expr[expr.size()-1] == '"') {
-        return new Expr(expr);
+    /* numbers and literals */
+    if (is_float(expr, parsed_float))       return new Expr(parsed_float);
+    else if (is_int(expr, parsed_int))      return new Expr(parsed_int);
+    else if (expr == "#t")                  return new Expr(LitType::TRUE);
+    else if (expr == "#f")                  return new Expr(LitType::FALSE);
+    else if (expr == "nil")                 return new Expr(LitType::NIL);
+    
+    /* symbol expression */
+    else                                    return new Expr(expr, nullptr);
+}
+
+static Expr *make_list(ExpType type, std::string expr, Env *env) {
+    (void) expr;
+    (void) env;
+    (void) type;
+    return nullptr;
+}
+
+/**
+ * Helper function - generate primitive 'define' or 'set' expression 
+ * @param type Either PrimType::DEFINE or PrimType::SET
+ * @param tokens Vector containing parsed string tokens for a 'define' or
+ * 'set' expression
+ * @param env Pointer to env
+ * @returns Pointer to allocated expression for var assignment primitive
+ */
+static Expr *make_var_assignment(PrimType type, 
+                        std::vector<std::string> &tokens, Env *env) {
+    std::vector<Expr*> *args_list(new std::vector<Expr*>());
+    
+    if (tokens.size() != 3 && type == PrimType::DEFINE) {
+        throw "Missing arguments for 'define'";
     }
-    else if (is_float(expr, parsed_float)) {
-        return new Expr(parsed_float);
+    if (tokens.size() != 3 && type == PrimType::SET) {
+        throw "Missing arguments for 'set!'";
     }
-    else if (is_int(expr, parsed_int)) {
-        return new Expr(parsed_int);
+    Expr *sym_name = new Expr(tokens[1]);
+    Expr *sym_val  = build_AST(tokens[2], env);
+
+    args_list->push_back(sym_name);
+    args_list->push_back(sym_val);
+    return new Expr(type, args_list);
+}
+
+/**
+ * Helper function - generate primitive 'lambda' expression 
+ * @param tokens Vector containing parsed string tokens for a 'lambda' 
+ * expression
+ * @param env Pointer to env
+ * @returns Pointer to allocated expression for lambda primitive
+ */
+static Expr *make_lambda(std::vector<std::string> &tokens, Env *env) {
+    std::vector<Expr*> *args_list(new std::vector<Expr*>());
+
+    if (tokens.size() != 3) throw "Missing arguments for 'lambda'";
+    std::string _params = tokens[1];
+    std::string _body   = tokens[2];
+
+    if (_params[0] == '(' && _params[_params.size()-1] == ')') {
+        throw "Missing brackets for closure argument";
     }
+    if (_body[0] == '(' && _body[_body.size()-1] == ')') {
+        throw "Missing brackets for closure body";
+    }
+    Expr *params = make_list(ExpType::STRING, _params, env);
+    Expr *body   = build_AST(_body, env);
+
+    args_list->push_back(params);
+    args_list->push_back(body);
+    return new Expr(PrimType::LAMBDA, args_list);
+}
+
+/**
+ * Helper function - generic dispatcher to generate primitive expression
+ * @param tokens Vector containing parsed string tokens for input 
+ * expression
+ * @param env Pointer to env
+ * @returns Pointer to allocated primitive expression
+ */
+static Expr *make_prim(std::vector<std::string> &tokens, Env *env) {
+    const auto prim_type = token_table.find(tokens[0]);
+
+    if (prim_type == token_table.end())
+        throw "Undefined primitive type: '" + prim_type->first + "'";
+
+    /* var define and assignment */
+    if (prim_type->first == "define" || prim_type->first == "set")
+        return make_var_assignment(prim_type->second, tokens, env);
+    
+    /* lambda function */
+    else if (prim_type->first == "lambda")
+        return make_lambda(tokens, env);
+
+    /* other primitives */
     else {
-        return new Expr(expr, nullptr);
+        std::vector<Expr*> *args_list(new std::vector<Expr*>());
+        for (size_t i = 1; i < tokens.size(); i++) {
+            args_list->push_back(build_AST(tokens[i], env));
+        }
+        return new Expr(prim_type->second, args_list);
     }
 }
 
@@ -161,14 +273,21 @@ Expr *build_AST(std::string expr, Env *env) {
     (void) env;
     (void) expr;
 
-    if (expr[0] != '(' && expr[expr.size()-1] != ')') {
+    /* number/string/literal/symbol expression */
+    if (expr[0] != '(' && expr[expr.size()-1] != ')') 
         return make_const(expr);
-    }
-    if (expr[0] != '\'') {
-    }
+    
+    /* list expression */
+    // if (expr[0] != '\'')
 
     auto tokens = parse_expr(expr);
     if (tokens.size() == 0) throw "Can't parse expression of length zero";
+
+    /* primitive expression */
+    if (token_table.find(tokens[0]) != token_table.end())
+        return make_prim(tokens, env);
+
+    /* procedure call expression */
 
     return nullptr;
 }
