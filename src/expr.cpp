@@ -273,10 +273,18 @@ void Expr::print_to_console(void) {
     switch (type) {
         case ExpType::INT:     { std::cout << ival;               break; }
         case ExpType::FLOAT:   { std::cout << fval;               break; }
+        case ExpType::STRING:  { std::cout << sval;               break; }
         case ExpType::PROC:    { std::cout << "<procedure>";      break; }
-        case ExpType::PRIM:    { std::cout << "<primitive>";      break; }
-        case ExpType::STRING:  { std::cout << "'" << sval << "'"; break; }
         case ExpType::SYMBOL:  { std::get<1>(sym)->print_to_console(); break; }
+        case ExpType::PRIM:    {
+            switch (std::get<0>(prim)) {
+                case PrimType::LAMBDA:  std::cout << "<closure>"; break;
+                case PrimType::DEFINE:  break;
+                case PrimType::SET:     break;
+                default:                std::cout << "<primitive>"; break;
+            }
+            break;
+        }
         case ExpType::LIT:     {
             switch (lit) {
                 case LitType::TRUE:     std::cout<< "#t"; break;
@@ -284,6 +292,7 @@ void Expr::print_to_console(void) {
                 case LitType::NIL:      std::cout<< "()"; break;
                 default: break;
             }
+            break;
         }
         case ExpType::LIST:     {
             std::cout << "( ";
