@@ -26,11 +26,23 @@ enum class ExpType { LIT, INT, FLOAT, STRING, LIST, SYMBOL, PROC, PRIM };
 enum class PrimType { 
     IF, WHILE, DEFINE, SET,                         // Control flow, var assign
     ADD, SUB, MUL, DIV, MOD, GT, LT, GE, LE,        // Arithmetic operations
-    IS_NUM, IS_SYMBOL, IS_PROC, IS_LIST,            // Type check
+    IS_NUM, IS_SYM, IS_PROC, IS_LIST,               // Type check
     LAMBDA,                                         // Lambda expression
     CAR, CDR, CONS                                  // List comprehension
 };
 enum class LitType { TRUE, FALSE, NIL };
+const std::unordered_map<std::string, PrimType> token_table {
+    { "+"       , PrimType::ADD    },  { "-"         , PrimType::SUB     },
+    { "/"       , PrimType::DIV    },  { ">"         , PrimType::GT      },
+    { "<"       , PrimType::LT     },  { "mod"       , PrimType::MOD     },
+    { ">="      , PrimType::GE     },  { "<="        , PrimType::LE      },
+    { "car"     , PrimType::CAR    },  { "cdr"       , PrimType::CDR     }, 
+    { "CONS"    , PrimType::CONS   },  { "lambda"    , PrimType::LAMBDA  },
+    { "define"  , PrimType::DEFINE },  { "set"       , PrimType::SET     },
+    { "number?" , PrimType::IS_NUM },  { "procedure?", PrimType::IS_PROC },
+    { "symbol?" , PrimType::IS_SYM },  { "list?"     , PrimType::IS_LIST },
+    { "if"      , PrimType::IF     },  { "while"     , PrimType::WHILE   }
+};
 
 /* Forward-declartion of `Expr` class */
 class Expr;
@@ -116,6 +128,13 @@ public:
             default:                                 break;
         }
     };
+
+    /* Getters */
+    ExpType get_expr_type(void)     { return type; };
+    PrimType get_prim_type(void) { 
+        if (type != ExpType::PRIM) throw "Instance is not primitive type";
+        else return std::get<0>(prim);
+    }
 
     /* Evaluators */
     Expr eval_sym(Env *e);
@@ -440,6 +459,13 @@ std::vector<std::string> parse_expr(std::string expr) {
             int cursor = idx;
             idx += read_til_end_bracket(expr.substr(cursor), parsed);
             res.push_back(parsed);
+        }
+        else if (expr[idx] == '\'' && expr[idx+1] == '(') {
+            std::string parsed = "";
+            idx++;
+            int cursor = idx;
+            idx += read_til_end_bracket(expr.substr(cursor), parsed);
+            res.push_back("\'" + parsed);
         }
         else if (expr[idx] == ' ' || expr[idx] == '\n') {
             idx++;
