@@ -18,7 +18,7 @@ RM          = rm -f
 	$(CC) -c -o $@ $< $(CFLAGS)
 
 clean: 
-	rm -rf *.o core* nscm
+	rm -rf src/*.o core* nscm
 
-nscm: nscm.o
-	$(CC) $(CFLAGS) -o nscm nscm.o
+nscm: src/env.o src/expr.o src/parser.o src/nscm.o
+	$(CC) $(CFLAGS) -o nscm src/env.o src/expr.o src/parser.o src/nscm.o
