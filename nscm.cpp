@@ -93,7 +93,7 @@ private:
         int64_t ival; double fval; std::string sval = ""; LitType lit;
         std::vector<Expr*> *list;
         std::tuple<std::string, Expr*> sym;
-        std::tuple<PrimType, std::vector<Expr*> *> prim; 
+        std::tuple<PrimType, Expr*> prim; 
         std::tuple<Expr*, Expr*, Env*> proc;
     };
 
@@ -107,7 +107,7 @@ public:
 
     Expr(std::string sym_name, Expr *sym_val)
         : type(ExpType::SYMBOL), sym(std::make_tuple(sym_name, sym_val)) {}; 
-    Expr(PrimType t, std::vector<Expr*> *args) 
+    Expr(PrimType t, Expr *args) 
         : type(ExpType::PRIM), prim(std::make_tuple(t, args)) {};
     Expr(Expr *params, Expr *body, Env *env)
         : type(ExpType::PROC), proc(std::make_tuple(params, body, env)) {};
@@ -138,9 +138,9 @@ public:
 
     /* Evaluators */
     Expr eval_sym(Env *e);
-    Expr eval_proc(std::vector<Expr*> *bindings);
+    Expr eval_proc(Expr *args_list);
     Expr eval_prim(Env *e);
-    Expr eval(std::vector<Expr*> *bindings, Env *e);
+    Expr eval(Expr *args_list, Env *e);
 
     /* IO */
     void print_to_console(void);
@@ -160,14 +160,18 @@ Expr Expr::eval_sym(Env *e) {
 
 /**
  * Evaluate procedure expressions
- * @param bindings pointer to vector containing argument bindings
+ * @param args_list pointer to list expression containing argument bindings
  * @returns evaluated expression 
  */
-Expr Expr::eval_proc(std::vector<Expr*> *bindings) {
+Expr Expr::eval_proc(Expr *args_list) {
     if (type != ExpType::PROC) throw "Eval failed: Not procedure type!";
+    if (args_list->type != ExpType::LIST) throw "Args bindings not list type";
+    
     Expr *params = std::get<0>(proc);
     Expr *body   = std::get<1>(proc);
     Env  *env    = std::get<2>(proc);
+
+    std::vector<Expr*> *bindings = args_list->list;
 
     Env *new_env = new Env(env->get_tl());
     if (bindings->size() != params->list->size()) 
@@ -190,7 +194,8 @@ Expr Expr::eval_proc(std::vector<Expr*> *bindings) {
 Expr Expr::eval_prim(Env *e) {
     if (type != ExpType::PRIM) throw "Eval failed: Not primitive type!"; 
     PrimType prim_type = std::get<0>(prim);
-    std::vector<Expr*> args = *std::get<1>(prim);
+    Expr* args_list    = std::get<1>(prim);
+    std::vector<Expr*> args = *args_list->list;
 
     switch (prim_type) {
         /*======================= Var assign =============================*/
@@ -335,11 +340,11 @@ Expr Expr::eval_prim(Env *e) {
 /**
  * Evaluate generic expression. Delegate evaluation to data-type specific 
  * eval function.
- * @param bindings pointer to vector containing argument bindings
+ * @param args_list pointer to list expression containing argument bindings
  * @param e pointer to env
  * @returns evaluated expression 
  */
-Expr Expr::eval(std::vector<Expr*> *bindings, Env *e) {
+Expr Expr::eval(Expr *args_list, Env *e) {
     switch (type) {
         case ExpType::INT:      return Expr(this->ival);
         case ExpType::FLOAT:    return Expr(this->fval);
@@ -348,7 +353,7 @@ Expr Expr::eval(std::vector<Expr*> *bindings, Env *e) {
         case ExpType::LIT:      return Expr(this->lit) ;
         case ExpType::PRIM:     return eval_prim(e);
         case ExpType::SYMBOL:   return eval_sym(e);
-        case ExpType::PROC:     return eval_proc(bindings);
+        case ExpType::PROC:     return eval_proc(args_list);
         default:                throw "Eval failed: Unknown token type";
     }
 };
@@ -525,19 +530,26 @@ int main(int argc, char*argv[]) {
     std::vector<Expr*> args_vec = {&str_x, &str_y};
     Expr args_list(&args_vec);
 
-    std::vector<Expr*> div = {&sym_x, &sym_y};
+    std::vector<Expr*> div_vec = {&sym_x, &sym_y};
+    Expr div(&div_vec);
     Expr div_x_y_op(PrimType::DIV, &div);
 
-    std::vector<Expr*> lambda_div_x_y = {&args_list, &div_x_y_op};
+    std::vector<Expr*> lambda_div_x_y_vec = {&args_list, &div_x_y_op};
+    Expr lambda_div_x_y(&lambda_div_x_y_vec);
     Expr function(PrimType::LAMBDA, &lambda_div_x_y);
 
     Expr _x(int64_t(10)); Expr _y(3.0);
-    std::vector<Expr*> bindings = {&_x, &_y};
+    std::vector<Expr*> bindings_vec = {&_x, &_y};
+    Expr bindings(&bindings_vec);
+
+    Expr add(PrimType::ADD, &bindings);
 
     try {
         function.eval(NO_BINDING, &global_env)
                 .eval(&bindings, &global_env)
                 .print_to_console();
+        std::cout << "\n";
+        add.eval(NO_BINDING, &global_env).print_to_console();
         std::cout << "\n";
     }
     catch (const char* e) {
