@@ -57,13 +57,14 @@ PrimType Expr::get_prim_type(void) {
  *===========================================================================*/
 /**
  * Evaluate symbol expressions
+ * @param bindings pointer to vector containing argument bindings
  * @param e pointer to env
  * @returns evaluated expression 
  */
-Expr Expr::eval_sym(Env *e) {
+Expr Expr::eval_sym(std::vector<Expr*> *bindings, Env *e) {
     if (type != ExpType::SYMBOL) throw "Eval failed: Not symbol type!";
     std::string name = std::get<0>(sym);
-    return e->find_var(name)->eval(NO_BINDING, e);
+    return e->find_var(name)->eval(bindings, e);
 }
 
 /**
@@ -78,25 +79,27 @@ Expr Expr::eval_proc(std::vector<Expr*> *bindings) {
     Expr *body   = std::get<1>(proc);
     Env  *env    = std::get<2>(proc);
 
-    Env *new_env = new Env(env->get_tl());
+    Env *new_env = new Env(env);
+
     if (bindings->size() != params->list->size()) 
-        throw "Number of args does not match!";
+        throw "Non-matching number of args for procedure call";
     
     for (size_t i = 0; i < bindings->size(); i++) {
         Expr *param = params->list->at(i);
         if (param->type != ExpType::STRING) throw "Non-string typed argument";
-        Expr *value = new Expr(bindings->at(i)->eval(NO_BINDING, env));
+        Expr *value = new Expr(bindings->at(i)->eval(bindings, env));
         new_env->add_key_value_pair(param->sval, value);
     }
-    return body->eval(NO_BINDING, new_env);
+    return body->eval(bindings, new_env);
 }
 
 /**
  * Evaluate primitive expressions
+ * @param bindings pointer to vector containing argument bindings
  * @param e pointer to env
  * @returns evaluated expression 
  */
-Expr Expr::eval_prim(Env *e) {
+Expr Expr::eval_prim(std::vector<Expr*> *bindings, Env *e) {
     if (type != ExpType::PRIM) throw "Eval failed: Not primitive type!"; 
     PrimType prim_type = std::get<0>(prim);
     std::vector<Expr*> args = *std::get<1>(prim);
@@ -105,27 +108,28 @@ Expr Expr::eval_prim(Env *e) {
         /*======================= Var assign =============================*/
         case PrimType::DEFINE: {
             if (args.size() != 2) throw "Invalid num args for 'define'";
-            Expr name  = args[0]->eval(NO_BINDING, e);
+            Expr name  = args[0]->eval(bindings, e);
             Expr value = *args[1];
             
             Expr *defined_value = new Expr(value);
             if (name.type == ExpType::STRING) {
                 e->add_key_value_pair(name.sval, defined_value);
-                return Expr(name.sval, defined_value);
+                return Expr(LitType::NIL);
             }
             else throw "Non-string type variable name for 'define'";
         }
         case PrimType::SET: {
             if (args.size() != 2) throw "Invalid num args for 'set'";
-            Expr name  = args[0]->eval(NO_BINDING, e);
+            Expr name  = args[0]->eval(bindings, e);
             Expr value = *args[1];
             
             if (name.type == ExpType::STRING) {
-                Expr *var = e->find_var_in_frame(name.sval);
-                if (var == nullptr) throw "Set failed: Unknown identifier";
-                delete var;
+                Expr *old_val = e->find_var_in_frame(name.sval);
+                if (old_val == nullptr) throw "Set failed: Unknown identifier";
+                delete old_val;
                 Expr *set_value = new Expr(value);
-                return Expr(name.sval, set_value);
+                e->add_key_value_pair(name.sval, set_value);
+                return Expr(LitType::NIL);
             }
             else throw "Non-string type variable name for 'set!'";
         }
@@ -139,23 +143,23 @@ Expr Expr::eval_prim(Env *e) {
         /* If statement */
         case PrimType::IF: {
             if (args.size() != 3) throw "Invalid num args for 'if'";
-            Expr cond = args[0]->eval(NO_BINDING, e);
+            Expr cond = args[0]->eval(bindings, e);
             if (cond.type == ExpType::LIT && cond.lit == LitType::TRUE) 
-                return args[1]->eval(NO_BINDING, e);     
+                return args[1]->eval(bindings, e);     
             if (cond.type == ExpType::INT && cond.ival > 0)
-                return args[1]->eval(NO_BINDING, e);
+                return args[1]->eval(bindings, e);
             if (cond.type == ExpType::FLOAT && cond.fval > 0.0)
-                return args[1]->eval(NO_BINDING, e);
-            return args[2]->eval(NO_BINDING, e);
+                return args[1]->eval(bindings, e);
+            return args[2]->eval(bindings, e);
         }
         /* While statement */
         case PrimType::WHILE: {
             if (args.size() != 2) throw "Invalid num args for 'while'";
-            Expr cond = args[0]->eval(NO_BINDING, e);
+            Expr cond = args[0]->eval(bindings, e);
             if (cond.type != ExpType::LIT) throw "Condition not lit type!";
 
-            while (args[0]->eval(NO_BINDING, e).lit == LitType::TRUE)
-                args[1]->eval(NO_BINDING, e);
+            while (args[0]->eval(bindings, e).lit == LitType::TRUE)
+                args[1]->eval(bindings, e);
             
             return nullptr;
         }
@@ -164,7 +168,7 @@ Expr Expr::eval_prim(Env *e) {
         case PrimType::ADD: {
             double s = 0.0;
             for (const auto &arg : args) {
-                Expr exp = arg->eval(NO_BINDING, e);
+                Expr exp = arg->eval(bindings, e);
                 if (exp.type == ExpType::INT)          s += exp.ival;
                 else if (exp.type == ExpType::FLOAT)   s += exp.fval;
                 else throw "Invalid args type for '+'";
@@ -175,8 +179,8 @@ Expr Expr::eval_prim(Env *e) {
         /* Integer subtraction */
         case PrimType::SUB: {
             if (args.size() != 2) throw "Invalid num args for '-'";
-            Expr e1 = args[0]->eval(NO_BINDING, e);
-            Expr e2 = args[1]->eval(NO_BINDING, e);
+            Expr e1 = args[0]->eval(bindings, e);
+            Expr e2 = args[1]->eval(bindings, e);
 
             if (e1.type == ExpType::INT && e2.type == ExpType::INT)
                 return Expr(int64_t(e1.ival - e2.ival)); 
@@ -192,7 +196,7 @@ Expr Expr::eval_prim(Env *e) {
         case PrimType::MUL: {
             double p = 1.0;
             for (const auto &arg : args) {
-                Expr exp = arg->eval(NO_BINDING, e);
+                Expr exp = arg->eval(bindings, e);
                 if (exp.type == ExpType::INT)          p *= exp.ival;
                 else if (exp.type == ExpType::FLOAT)   p *= exp.fval;
                 else throw "Invalid args type for '*'";
@@ -203,8 +207,8 @@ Expr Expr::eval_prim(Env *e) {
         /* Integer division */
         case PrimType::DIV: {
             if (args.size() != 2) throw "Invalid num args for '/'";
-            Expr e1 = args[0]->eval(NO_BINDING, e);
-            Expr e2 = args[1]->eval(NO_BINDING, e);
+            Expr e1 = args[0]->eval(bindings, e);
+            Expr e2 = args[1]->eval(bindings, e);
 
             if ((e2.type == ExpType::INT && e2.ival == 0) ||
                 (e2.type == ExpType::FLOAT && e2.fval == 0)) 
@@ -223,8 +227,8 @@ Expr Expr::eval_prim(Env *e) {
         /* Integer modulo */
         case PrimType::MOD: {
             if (args.size() != 2) throw "Invalid num args for 'modulo'";
-            Expr e1 = args[0]->eval(NO_BINDING, e);
-            Expr e2 = args[1]->eval(NO_BINDING, e);
+            Expr e1 = args[0]->eval(bindings, e);
+            Expr e2 = args[1]->eval(bindings, e);
 
             if ((e2.type == ExpType::INT && e2.ival == 0) ||
                 (e2.type == ExpType::FLOAT && e2.fval == 0)) 
@@ -255,8 +259,8 @@ Expr Expr::eval(std::vector<Expr*> *bindings, Env *e) {
         case ExpType::STRING:   return *this;
         case ExpType::LIST:     return *this;
         case ExpType::LIT:      return *this;
-        case ExpType::PRIM:     return eval_prim(e);
-        case ExpType::SYMBOL:   return eval_sym(e);
+        case ExpType::PRIM:     return eval_prim(bindings, e);
+        case ExpType::SYMBOL:   return eval_sym(bindings, e);
         case ExpType::PROC:     return eval_proc(bindings);
         default:                throw "Eval failed: Unknown token type";
     }
@@ -275,8 +279,14 @@ void Expr::print_to_console(void) {
         case ExpType::FLOAT:   { std::cout << fval;               break; }
         case ExpType::STRING:  { std::cout << sval;               break; }
         case ExpType::PROC:    { std::cout << "<procedure>";      break; }
-        case ExpType::SYMBOL:  { std::get<1>(sym)->print_to_console(); break; }
-        case ExpType::PRIM:    {
+        case ExpType::SYMBOL:  { 
+            if (std::get<1>(sym))
+                std::get<1>(sym)->print_to_console();
+            else 
+                std::cerr << "Unknown symbol '" << std::get<0>(sym) << "'\n";
+            break;
+        }
+        case ExpType::PRIM: {
             switch (std::get<0>(prim)) {
                 case PrimType::LAMBDA:  std::cout << "<closure>"; break;
                 case PrimType::DEFINE:  break;
@@ -285,7 +295,7 @@ void Expr::print_to_console(void) {
             }
             break;
         }
-        case ExpType::LIT:     {
+        case ExpType::LIT: {
             switch (lit) {
                 case LitType::TRUE:     std::cout<< "#t"; break;
                 case LitType::FALSE:    std::cout<< "#f"; break;
@@ -294,12 +304,13 @@ void Expr::print_to_console(void) {
             }
             break;
         }
-        case ExpType::LIST:     {
-            std::cout << "( ";
-            for (const auto &elem : *list) {
-                elem->print_to_console(); std::cout << " ";
+        case ExpType::LIST: {
+            std::cout << "(";
+            size_t i = 0;
+            for (; i < list->size() - 1; i++) {
+                list->at(i)->print_to_console(); std::cout << " ";
             }
-            std::cout << ")";
+            list->at(i)->print_to_console();     std::cout << ")";
             break;
         }
         default: break;

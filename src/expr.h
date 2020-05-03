@@ -68,9 +68,9 @@ public:
     PrimType get_prim_type(void);
 
     /* Evaluators */
-    Expr eval_sym(Env *e);
+    Expr eval_sym(std::vector<Expr*> *bindings, Env *e);
     Expr eval_proc(std::vector<Expr*> *bindings);
-    Expr eval_prim(Env *e);
+    Expr eval_prim(std::vector<Expr*> *bindings, Env *e);
     Expr eval(std::vector<Expr*> *bindings, Env *e);
 
     /* IO */
