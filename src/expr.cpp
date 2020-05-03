@@ -126,8 +126,6 @@ Expr Expr::eval_prim(std::vector<Expr*> *bindings, Env *e) {
                 if (old_val == nullptr) 
                     throw "Unbounded variable '" + name.sval + "'";
                 
-                // delete old_val;
-
                 // Re-bind variable name to a new expression in env
                 e->add_key_value_pair(name.sval, args[1]);
                 return Expr(LitType::NIL);
