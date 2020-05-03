@@ -43,7 +43,11 @@ static inline bool is_int(std::string expr, int64_t &parsed) {
  * reference. Else, return false.
  */
 static inline bool is_float(std::string expr, double &parsed) {
-    try { parsed = std::stod(expr, nullptr); return true; }
+    try { 
+        parsed = std::stod(expr, nullptr); 
+        if (expr.find('.') == std::string::npos) return false; 
+        return true; 
+    }
     catch(...) { return false; }
 }
 
@@ -129,6 +133,7 @@ std::vector<std::string> parse_expr(std::string expr) {
         else if (expr[idx] == ' ' || expr[idx] == '\n') {
             idx++;
         }
+        else if (expr[idx] == ')') throw "Unmatching ')'";
         else {
             std::string parsed = "";
             int cursor = idx;
@@ -148,9 +153,10 @@ Expr *build_AST(std::string expr, Env *env);
 /**
  * Helper function - generate number/string/literal/symbol expression 
  * @param expr Input expression string
+ * @param env Pointer to env
  * @returns Pointer to allocated number/string/literal/symbol expression
  */
-static Expr *make_const(std::string expr) {
+static Expr *make_const(std::string expr, Env *env) {
     /* string expression */
     if (expr.size() > 1 && expr[0] == '"' && expr[expr.size()-1] == '"')
         return new Expr(expr);
@@ -168,14 +174,25 @@ static Expr *make_const(std::string expr) {
     else if (expr == "nil")                 return new Expr(LitType::NIL);
     
     /* symbol expression */
-    else                                    return new Expr(expr, nullptr);
+    else {
+        Expr *var = env->find_var_in_frame(expr);
+        if (var != nullptr) return var;
+        else return new Expr(expr, nullptr);
+    }
 }
 
-static Expr *make_list(ExpType type, std::string expr, Env *env) {
-    (void) expr;
-    (void) env;
-    (void) type;
-    return nullptr;
+/**
+ * Helper function - generate list expression containing params literals
+ * @param expr Input expression string
+ * @returns Pointer to allocated list expression
+ */
+static Expr *make_params_list(std::string expr) {
+    auto tokens = parse_expr(expr);
+    std::vector<Expr*> *list(new std::vector<Expr*>());
+    for (auto &token : tokens) {
+        list->push_back(new Expr(token));
+    }
+    return new Expr(list);
 }
 
 /**
@@ -188,20 +205,22 @@ static Expr *make_list(ExpType type, std::string expr, Env *env) {
  */
 static Expr *make_var_assignment(PrimType type, 
                         std::vector<std::string> &tokens, Env *env) {
-    std::vector<Expr*> *args_list(new std::vector<Expr*>());
-    
+    std::vector<Expr*> args_list {};
     if (tokens.size() != 3 && type == PrimType::DEFINE) {
         throw "Missing arguments for 'define'";
     }
     if (tokens.size() != 3 && type == PrimType::SET) {
         throw "Missing arguments for 'set!'";
     }
-    Expr *sym_name = new Expr(tokens[1]);
-    Expr *sym_val  = build_AST(tokens[2], env);
+    Expr sym_name = Expr(tokens[1]);
+    Expr *sym_val = build_AST(tokens[2], env);
 
-    args_list->push_back(sym_name);
-    args_list->push_back(sym_val);
-    return new Expr(type, args_list);
+    args_list.push_back(&sym_name);
+    args_list.push_back(sym_val);
+    
+    // Add variable binding to environment
+    Expr symbol = Expr(type, &args_list).eval(NO_BINDING, env);
+    return new Expr(symbol);
 }
 
 /**
@@ -212,19 +231,19 @@ static Expr *make_var_assignment(PrimType type,
  * @returns Pointer to allocated expression for lambda primitive
  */
 static Expr *make_lambda(std::vector<std::string> &tokens, Env *env) {
-    std::vector<Expr*> *args_list(new std::vector<Expr*>());
+    std::vector<Expr*> *args_list(new std::vector<Expr*>({}));
 
     if (tokens.size() != 3) throw "Missing arguments for 'lambda'";
     std::string _params = tokens[1];
     std::string _body   = tokens[2];
 
-    if (_params[0] == '(' && _params[_params.size()-1] == ')') {
+    if (_params[0] != '(' || _params[_params.size()-1] != ')') {
         throw "Missing brackets for closure argument";
     }
-    if (_body[0] == '(' && _body[_body.size()-1] == ')') {
+    if (_body[0] != '(' || _body[_body.size()-1] != ')') {
         throw "Missing brackets for closure body";
     }
-    Expr *params = make_list(ExpType::STRING, _params, env);
+    Expr *params = make_params_list(_params);
     Expr *body   = build_AST(_body, env);
 
     args_list->push_back(params);
@@ -264,21 +283,43 @@ static Expr *make_prim(std::vector<std::string> &tokens, Env *env) {
 }
 
 /**
+ * Helper function - generate procedure call expression 
+ * @param tokens Vector containing string tokens for procedure call
+ * expression
+ * @param env Pointer to env
+ * @returns Pointer to allocated procedure call expression
+ */
+Expr *make_proc_call(std::vector<std::string> tokens, Env *env) {
+    std::vector<Expr*> bindings = {};
+    if (tokens.size() < 1) throw "Too few arguments for procedure call";
+    Expr *caller = build_AST(tokens[0], env);
+
+    for (size_t i = 1; i < tokens.size(); i++) {
+        bindings.push_back(build_AST(tokens[i], env));
+    }
+    return new Expr((caller->eval(&bindings, env)).eval(&bindings, env));
+}
+
+/**
  * Recursively generates AST based on input string
  * @param expr String of expressions
  * @param env Pointer to Env
  * @returns Pointer to root AST node
  */
 Expr *build_AST(std::string expr, Env *env) {
-    (void) env;
-    (void) expr;
-
-    /* number/string/literal/symbol expression */
+    /* number - string - literal - symbol expression */
     if (expr[0] != '(' && expr[expr.size()-1] != ')') 
-        return make_const(expr);
+        return make_const(expr, env);
     
     /* list expression */
-    // if (expr[0] != '\'')
+    if (expr[0] == '\'') {
+        auto tokens = parse_expr(expr.substr(1));
+        std::vector<Expr*> *list(new std::vector<Expr*>());
+        for (auto &token : tokens) {
+            list->push_back(make_const(token, env));
+        }
+        return new Expr(list);
+    }
 
     auto tokens = parse_expr(expr);
     if (tokens.size() == 0) throw "Can't parse expression of length zero";
@@ -288,6 +329,5 @@ Expr *build_AST(std::string expr, Env *env) {
         return make_prim(tokens, env);
 
     /* procedure call expression */
-
-    return nullptr;
+    return make_proc_call(tokens, env);
 }
