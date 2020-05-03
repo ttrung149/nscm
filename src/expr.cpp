@@ -108,27 +108,28 @@ Expr Expr::eval_prim(std::vector<Expr*> *bindings, Env *e) {
         /*======================= Var assign =============================*/
         case PrimType::DEFINE: {
             if (args.size() != 2) throw "Invalid num args for 'define'";
-            Expr name  = args[0]->eval(bindings, e);
-            Expr value = *args[1];
-            
-            Expr *defined_value = new Expr(value);
+            Expr name = args[0]->eval(bindings, e);
+
+            // Bind variable name to an expression in environment
             if (name.type == ExpType::STRING) {
-                e->add_key_value_pair(name.sval, defined_value);
+                e->add_key_value_pair(name.sval, args[1]);
                 return Expr(LitType::NIL);
             }
             else throw "Non-string type variable name for 'define'";
         }
         case PrimType::SET: {
             if (args.size() != 2) throw "Invalid num args for 'set'";
-            Expr name  = args[0]->eval(bindings, e);
-            Expr value = *args[1];
+            Expr name = args[0]->eval(bindings, e);
             
             if (name.type == ExpType::STRING) {
                 Expr *old_val = e->find_var_in_frame(name.sval);
-                if (old_val == nullptr) throw "Set failed: Unknown identifier";
-                delete old_val;
-                Expr *set_value = new Expr(value);
-                e->add_key_value_pair(name.sval, set_value);
+                if (old_val == nullptr) 
+                    throw "Unbounded variable '" + name.sval + "'";
+                
+                // delete old_val;
+
+                // Re-bind variable name to a new expression in env
+                e->add_key_value_pair(name.sval, args[1]);
                 return Expr(LitType::NIL);
             }
             else throw "Non-string type variable name for 'set!'";
