@@ -6,7 +6,7 @@
  *  Description: Implementation of `Env` class
  * 
  *==========================================================================*/
- #include "env.h"
+#include "env.h"
 
  /* Constructors */
 Env::Env(std::unordered_map<std::string, Expr*> &f)
@@ -33,7 +33,7 @@ Expr* Env::find_var(std::string name) {
     else if (itr == frame.end() && tail != nullptr) {
         return this->tail->find_var(name);
     }
-    else throw "Unknown identifier: '" + name + "'";
+    else return nullptr;
 };
 
 Expr* Env::find_var_in_frame(std::string name) {
