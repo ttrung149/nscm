@@ -81,7 +81,7 @@ Expr Expr::eval_proc(std::vector<Expr*> *bindings) {
 
     Env *new_env = new Env(env);
 
-    if (bindings->size() != params->list->size()) 
+    if (bindings == nullptr || bindings->size() != params->list->size()) 
         throw "Non-matching number of args for procedure call";
     
     for (size_t i = 0; i < bindings->size(); i++) {
@@ -237,6 +237,48 @@ Expr Expr::eval_prim(std::vector<Expr*> *bindings, Env *e) {
                 return Expr(e1.ival % e2.ival);
             else throw "Invalid args type for 'modulo'";
         }
+        /*======================= Comparators =============================*/
+        /* Greater than */
+        case PrimType::GT: {
+            if (args.size() != 2) throw "Invalid num args for 'modulo'";
+            Expr e1 = args[0]->eval(bindings, e);
+            Expr e2 = args[1]->eval(bindings, e);
+
+            if (e1.type == ExpType::INT && e2.type == ExpType::INT)
+                if (e1.ival > e2.ival) return Expr(LitType::TRUE);
+                else return Expr(LitType::FALSE);
+            else if (e1.type == ExpType::FLOAT && e2.type == ExpType::INT)
+                if (e1.fval > e2.ival) return Expr(LitType::TRUE);
+                else return Expr(LitType::FALSE);
+            else if (e1.type == ExpType::INT && e2.type == ExpType::FLOAT)
+                if (e1.ival > e2.fval) return Expr(LitType::TRUE);
+                else return Expr(LitType::FALSE);
+            else if (e1.type == ExpType::FLOAT && e2.type == ExpType::FLOAT)
+                if (e1.fval > e2.fval) return Expr(LitType::TRUE);
+                else return Expr(LitType::FALSE);
+            else throw "Invalid args type for 'modulo'";
+        }
+        /* Less than */
+        case PrimType::LT: {
+            if (args.size() != 2) throw "Invalid num args for 'modulo'";
+            Expr e1 = args[0]->eval(bindings, e);
+            Expr e2 = args[1]->eval(bindings, e);
+
+            if (e1.type == ExpType::INT && e2.type == ExpType::INT)
+                if (e1.ival < e2.ival) return Expr(LitType::TRUE);
+                else return Expr(LitType::FALSE);
+            else if (e1.type == ExpType::FLOAT && e2.type == ExpType::INT)
+                if (e1.fval < e2.ival) return Expr(LitType::TRUE);
+                else return Expr(LitType::FALSE);
+            else if (e1.type == ExpType::INT && e2.type == ExpType::FLOAT)
+                if (e1.ival < e2.fval) return Expr(LitType::TRUE);
+                else return Expr(LitType::FALSE);
+            else if (e1.type == ExpType::FLOAT && e2.type == ExpType::FLOAT)
+                if (e1.fval < e2.fval) return Expr(LitType::TRUE);
+                else return Expr(LitType::FALSE);
+            else throw "Invalid args type for 'modulo'";
+        }
+
         /*======================= Type checking ===========================*/
 
         /*======================= Invalid primative =======================*/
