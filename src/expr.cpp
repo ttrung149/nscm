@@ -63,27 +63,79 @@ PrimType Expr::get_prim_type(void) {
  */
 Expr Expr::eval_sym(std::vector<Expr*> *bindings, Env *e) {
     if (type != ExpType::SYMBOL) throw "Eval failed: Not symbol type!";
-    std::string name = std::get<0>(sym);
-    return e->find_var(name)->eval(bindings, e);
+
+    Expr *found_val = e->find_var(std::get<0>(sym));
+    if (found_val != nullptr)
+        return found_val->eval(bindings, e);
+    else     
+        throw "Unknown identifier: '" + std::get<0>(sym) + "'";
 }
 
 /**
  * Evaluate procedure expressions
  * @param bindings pointer to vector containing argument bindings
+ * @param e pointer to env
  * @returns evaluated expression 
  */
-Expr Expr::eval_proc(std::vector<Expr*> *bindings) {
+Expr Expr::eval_proc(std::vector<Expr*> *bindings, Env *e) {
     if (type != ExpType::PROC) throw "Eval failed: Not procedure type!";
     
     Expr *params = std::get<0>(proc);
     Expr *body   = std::get<1>(proc);
     Env  *env    = std::get<2>(proc);
 
-    Env *new_env = new Env(env);
-
     if (bindings == nullptr || bindings->size() != params->list->size()) 
         throw "Non-matching number of args for procedure call";
-    
+    Env *new_env = new Env(env);
+
+    /** 
+     * For recursive function, function body is first initialized as 
+     * an unbounded symbol. To evaluate recursive function, the function 
+     * body must be evaluated, and then applied to the evaluated parameter
+     * For example, consider `fact` function that recursively calls itself
+     * to calculate the factorial:
+     * 
+     * ```(define fact (lambda (n) (if (< n 2) 1 (* n (fact (- n 1))))))```
+     * ```(fact 10)```
+     * 
+     * When (fact (- n 1)) is parsed, `fact` is initialized as an unbounded 
+     * symbol, `(- n 1)` is initalized as a prim. When (fact 10) is evaluated,
+     * `fact` is evaluated to match symbol to defined procedure. Furthermore,
+     * (- n 1) must also be evaluated to get the necessary binding for next
+     * procedure call. Lastly, the value of `n` must be updated in the
+     * environment to ensure the recursive function terminates.
+     */
+    if (body->get_expr_type() == ExpType::SYMBOL) {
+        // symbol -> lambda -> procedure
+        Expr caller = body->eval(bindings, e);
+        if (caller.get_expr_type() != ExpType::PROC)
+            throw "Eval failed: Not procedure type!";
+        
+        Expr *_params = std::get<0>(caller.proc);
+        Expr *_body   = std::get<1>(caller.proc);
+        std::vector<Expr*> eval_params_list = {};
+        
+        for (size_t i = 0; i < params->list->size(); i++) {
+            Expr *_param = _params->list->at(i);
+            if (_param->type != ExpType::STRING)
+                throw "Non-string typed argument";
+            
+            Expr *eval_param 
+                = new Expr(params->list->at(i)->eval(bindings, e));
+
+            new_env->add_key_value_pair(_param->sval, eval_param);
+            eval_params_list.push_back(eval_param);
+        }
+        return _body->eval(&eval_params_list, new_env);
+    }
+
+    /**
+     * Non-recursive procedure call case
+     * To evaluate non-recursive procedure call, evaluate params and add
+     * a param to binding pair to the new environment frame. Evaluate 
+     * function body in such new environment to obtain the procedure call
+     * result.
+     */
     for (size_t i = 0; i < bindings->size(); i++) {
         Expr *param = params->list->at(i);
         if (param->type != ExpType::STRING) throw "Non-string typed argument";
@@ -302,7 +354,7 @@ Expr Expr::eval(std::vector<Expr*> *bindings, Env *e) {
         case ExpType::LIT:      return *this;
         case ExpType::PRIM:     return eval_prim(bindings, e);
         case ExpType::SYMBOL:   return eval_sym(bindings, e);
-        case ExpType::PROC:     return eval_proc(bindings);
+        case ExpType::PROC:     return eval_proc(bindings, e);
         default:                throw "Eval failed: Unknown token type";
     }
 };

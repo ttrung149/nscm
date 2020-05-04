@@ -174,9 +174,17 @@ static Expr *make_const(std::string expr, Env *env) {
     else if (expr == "nil")                 return new Expr(LitType::NIL);
     
     /* symbol expression */
+    // Return expression that variable points to if variable is binded to env
+    // Else return a new unbinded symbol
     else {
-        Expr *var = env->find_var_in_frame(expr);
-        if (var != nullptr) return var;
+        Expr *var = env->find_var(expr);
+        if (var != nullptr) {
+            if (var->get_expr_type() == ExpType::PROC)      return var;
+            if (var->get_expr_type() == ExpType::PRIM &&
+                var->get_prim_type() == PrimType::LAMBDA)   return var;
+            
+            return new Expr(var->eval(NO_BINDING, nullptr));
+        }
         else return new Expr(expr, nullptr);
     }
 }
@@ -206,13 +214,13 @@ static Expr *make_params_list(std::string expr) {
 static Expr *make_var_assignment(PrimType type, 
                         std::vector<std::string> &tokens, Env *env) {
     std::vector<Expr*> args_list {};
-    if (tokens.size() != 3 && type == PrimType::DEFINE) {
-        throw "Missing arguments for 'define'";
-    }
-    if (tokens.size() != 3 && type == PrimType::SET) {
-        throw "Missing arguments for 'set!'";
-    }
+    if (tokens.size() != 3 && type == PrimType::DEFINE)
+        throw "Invalid number of arguments for 'define'";
+    if (tokens.size() != 3 && type == PrimType::SET)
+        throw "Invalid number of arguments for 'set!'";
+    
     Expr sym_name = Expr(tokens[1]);
+    env->add_key_value_pair(tokens[1], nullptr);
     Expr *sym_val = build_AST(tokens[2], env);
 
     args_list.push_back(&sym_name);
@@ -231,18 +239,17 @@ static Expr *make_var_assignment(PrimType type,
  * @returns Pointer to allocated expression for lambda primitive
  */
 static Expr *make_lambda(std::vector<std::string> &tokens, Env *env) {
-    std::vector<Expr*> *args_list(new std::vector<Expr*>({}));
+    std::vector<Expr*> *args_list(new std::vector<Expr*>());
 
     if (tokens.size() != 3) throw "Missing arguments for 'lambda'";
     std::string _params = tokens[1];
     std::string _body   = tokens[2];
 
-    if (_params[0] != '(' || _params[_params.size()-1] != ')') {
+    if (_params[0] != '(' || _params[_params.size()-1] != ')')
         throw "Missing brackets for closure argument";
-    }
-    if (_body[0] != '(' || _body[_body.size()-1] != ')') {
+    if (_body[0] != '(' || _body[_body.size()-1] != ')')
         throw "Missing brackets for closure body";
-    }
+
     Expr *params = make_params_list(_params);
     Expr *body   = build_AST(_body, env);
 
@@ -275,9 +282,9 @@ static Expr *make_prim(std::vector<std::string> &tokens, Env *env) {
     /* other primitives */
     else {
         std::vector<Expr*> *args_list(new std::vector<Expr*>());
-        for (size_t i = 1; i < tokens.size(); i++) {
+        for (size_t i = 1; i < tokens.size(); i++)
             args_list->push_back(build_AST(tokens[i], env));
-        }
+
         return new Expr(prim_type->second, args_list);
     }
 }
@@ -290,14 +297,37 @@ static Expr *make_prim(std::vector<std::string> &tokens, Env *env) {
  * @returns Pointer to allocated procedure call expression
  */
 Expr *make_proc_call(std::vector<std::string> tokens, Env *env) {
-    std::vector<Expr*> bindings = {};
-    if (tokens.size() < 1) throw "Too few arguments for procedure call";
+    std::vector<Expr*> *bindings(new std::vector<Expr*>());
+
+    if (tokens.size() < 2) throw "Too few arguments for procedure call";
     Expr *caller = build_AST(tokens[0], env);
 
-    for (size_t i = 1; i < tokens.size(); i++) {
-        bindings.push_back(build_AST(tokens[i], env));
+    for (size_t i = 1; i < tokens.size(); i++)
+        bindings->push_back(build_AST(tokens[i], env));
+
+    // If caller has procedure type, evaluate caller with bindings
+    if (caller->get_expr_type() == ExpType::PROC)
+        return new Expr((caller->eval(bindings, env)));
+
+    // If caller has lambda type, evaluate the caller first to 
+    // obtain procedure, then proceed to evaluate procedure
+    else if (caller->get_expr_type() == ExpType::PRIM && 
+             caller->get_prim_type() == PrimType::LAMBDA)
+        return new Expr((caller->eval(bindings, env).eval(bindings, env)));
+
+    // If caller has symbol type, return new procedure with unbounded symbol.
+    // See `expr.cpp::90` for more explanation
+    else if (caller->get_expr_type() == ExpType::SYMBOL) {
+        bool found = env->is_in_env(tokens[0]);
+        Expr *found_expr = env->find_var(tokens[0]);
+        if (found && found_expr != nullptr) return found_expr;
+        else if (found && found_expr == nullptr) 
+            return new Expr(new Expr(bindings), caller, env);
+        else throw "Unknown procedure identifier: '" + tokens[0] + "'";
     }
-    return new Expr((caller->eval(&bindings, env)).eval(&bindings, env));
+    
+    // Invalid caller type
+    else throw "'" + tokens[0] + "' cannot be procedurally called";
 }
 
 /**
