@@ -130,6 +130,9 @@ std::vector<std::string> parse_expr(std::string expr) {
             idx += read_til_end_bracket(expr.substr(cursor), parsed);
             res.push_back("\'" + parsed);
         }
+        else if (expr[idx] == ';') {
+            while (expr[idx] != '\n') idx++;
+        }
         else if (expr[idx] == ' ' || expr[idx] == '\n') {
             idx++;
         }

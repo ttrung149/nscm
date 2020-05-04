@@ -376,7 +376,7 @@ void Expr::print_to_console(void) {
             if (std::get<1>(sym))
                 std::get<1>(sym)->print_to_console();
             else 
-                std::cerr << "Unknown symbol '" << std::get<0>(sym) << "'\n";
+                std::cerr << "Unknown symbol '" << std::get<0>(sym) << "'";
             break;
         }
         case ExpType::PRIM: {

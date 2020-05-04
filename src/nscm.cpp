@@ -8,9 +8,48 @@
  *  Usage: Run `./nscm --help` for more information.
  * 
  *==========================================================================*/
+#include <csignal>
 #include "env.h"
 #include "expr.h"
 #include "parser.h"
+
+void terminate(int signum) {
+    exit(signum);
+}
+
+/*============================================================================
+ *  REPL implementation
+ *===========================================================================*/
+void repl(std::istream &in) {
+    std::unordered_map<std::string, Expr*> std_env_frame {};
+    Env global_env(std_env_frame);
+
+    while (true) {
+        std::string expr_str;
+        std::cout << "nscm> ";
+        std::getline(in, expr_str);
+        if (expr_str.size() < 1) break;
+        if (expr_str == "exit") break;
+
+        try {
+            Expr *expr = build_AST(expr_str, &global_env);
+            if (expr->get_expr_type() == ExpType::PRIM)
+                expr->eval(NO_BINDING, &global_env).print_to_console();
+            else
+                expr->print_to_console();
+            std::cout << "\n";
+        }
+        catch (const char* e) {
+            std::cerr << "ERR: " << e << "\n";
+        }
+        catch (const std::string &e) {
+            std::cerr << "ERR: " << e << "\n";
+        }
+        catch (...) {
+            std::cerr << "Unexpected error\n";
+        }
+    }
+}
 
 /*============================================================================
  *  Main driver
@@ -18,57 +57,8 @@
 int main(int argc, char*argv[]) {
     (void) argc;
     (void) argv;
-    std::unordered_map<std::string, Expr*> std_env_frame = {};
-    Env global_env(std_env_frame);
-
-    // ((lambda (x y) (/ x y)) 10 2) = 5
-    Expr str_x("x");                Expr str_y("y");
-    Expr sym_x("x", nullptr);       Expr sym_y("y", nullptr);
-
-    std::vector<Expr*> args_vec = {&str_x, &str_y};
-    Expr args_list(&args_vec);
-
-    std::vector<Expr*> div_vec = {&sym_x, &sym_y};
-    Expr div_x_y_op(PrimType::DIV, &div_vec);
-
-    std::vector<Expr*> lambda_div_x_y_vec = {&args_list, &div_x_y_op};
-    Expr function(PrimType::LAMBDA, &lambda_div_x_y_vec);
-
-    Expr _x(int64_t(10)); Expr _y(3.0);
-    std::vector<Expr*> bindings = {&_x, &_y};
-
-    Expr add(PrimType::ADD, &bindings);
-
-    try {
-        function.eval(NO_BINDING, &global_env)
-                .eval(&bindings, &global_env)
-                .print_to_console();
-        std::cout << "\n";
-        add.eval(NO_BINDING, &global_env).print_to_console();
-        std::cout << "\n";
-    }
-    catch (const char* e) {
-        std::cerr << "ERR: " << e << "\n";
-        exit(EXIT_FAILURE);
-    }
-    catch (const std::string &e) {
-        std::cerr << "ERR: " << e << "\n";
-        exit(EXIT_FAILURE);
-    }
-
-    try {
-        build_AST("3124.3123", nullptr)
-        ->eval(NO_BINDING, &global_env).print_to_console();
-        std::cout << "\n";
-    }
-    catch (const char* e) {
-        std::cerr << "ERR: " << e << "\n";
-        exit(EXIT_FAILURE);
-    }
-    catch (const std::string &e) {
-        std::cerr << "ERR: " << e << "\n";
-        exit(EXIT_FAILURE);
-    }
+    signal(SIGINT, terminate);
+    repl(std::cin);
 
     return 0;
 }
