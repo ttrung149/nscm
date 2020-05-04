@@ -32,6 +32,7 @@ public:
     /* Env state modifiers  */
     Env *get_tl();
     void add_key_value_pair(std::string &k, Expr *v);
+    bool is_in_env(std::string name);
     Expr *find_var(std::string name);
     Expr *find_var_in_frame(std::string name);
 };

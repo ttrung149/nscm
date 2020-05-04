@@ -27,6 +27,15 @@ void Env::add_key_value_pair(std::string &k, Expr *v) {
     frame[k] = v;
 };
 
+bool Env::is_in_env(std::string name) {
+    const auto itr = frame.find(name);
+    if (itr != frame.end()) return true;
+    else if (itr == frame.end() && tail != nullptr) {
+        return this->tail->is_in_env(name);
+    }
+    else return false;
+}
+
 Expr* Env::find_var(std::string name) {
     const auto itr = frame.find(name);
     if (itr != frame.end()) return itr->second;
