@@ -69,7 +69,7 @@ public:
 
     /* Evaluators */
     Expr eval_sym(std::vector<Expr*> *bindings, Env *e);
-    Expr eval_proc(std::vector<Expr*> *bindings);
+    Expr eval_proc(std::vector<Expr*> *bindings, Env *e);
     Expr eval_prim(std::vector<Expr*> *bindings, Env *e);
     Expr eval(std::vector<Expr*> *bindings, Env *e);
 
