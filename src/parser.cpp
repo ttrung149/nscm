@@ -61,7 +61,7 @@ static inline bool is_float(std::string expr, double &parsed) {
  * Find the closest word in the string before encountering a space
  * or a new line character
  * @param expr String of expression
- * @param parse Reference to parsed string
+ * @param parsed Reference to parsed string
  * @returns The next position on the expression string from where the parsed
  * string ends
  */
@@ -75,6 +75,35 @@ static size_t read_til_space(std::string expr, std::string &parsed) {
         else curr_str += expr[idx];
         idx++;
     }
+    parsed = curr_str;
+    return idx;
+}
+
+/**
+ * Find the closest expression in the string before encountering a matching
+ * bracket. For every '"', there must be a matching '"' in argument string,
+ * else an Exception is thrown.
+ * @param expr String of expression
+ * @param parsed Reference to parsed string
+ * @returns The next position on the expression string from where the parsed
+ * string ends
+ */
+static size_t read_til_end_quote(std::string expr, std::string &parsed) {
+    size_t idx = expr.find('\"');
+    if (idx == std::string::npos) throw "Missing '\"'";
+    std::string curr_str = "\"";
+    bool is_open_quote = true;
+    idx++;
+
+    while (is_open_quote && idx < expr.size()) {
+        if (expr[idx] == '\"') {
+            is_open_quote = !is_open_quote;
+            curr_str += expr[idx];
+        }
+        else curr_str += expr[idx];
+        idx++;
+    }
+    if (is_open_quote) throw "Unmatching quote \n>>> '" + expr + "'";
     parsed = curr_str;
     return idx;
 }
@@ -113,20 +142,29 @@ static size_t read_til_end_bracket(std::string expr, std::string &parsed) {
  * Exception is thrown if input string cannot be parsed (syntax error)
  */
 std::vector<std::string> parse_expr(std::string expr) {
-    size_t expr_len = expr.size();
-    if (expr_len == 0) 
+    if (expr.size() == 0) 
         throw "Unable to parse empty string";
-    if (expr[0] != '(' || expr[expr_len-1] != ')')
+    
+    size_t open_brack = expr.find('(');
+    size_t close_brack = expr.find_last_of(')');
+
+    if (open_brack == std::string::npos || close_brack == std::string::npos)
         throw "Unmatching brackets \n>>> '" + expr + "'";
 
-    size_t idx = 1;
+    size_t idx = open_brack + 1;
     std::vector<std::string> res;
 
-    while (idx < expr_len - 1) {
+    while (idx < close_brack) {
         if (expr[idx] == '(') {
             std::string parsed = "";
             int cursor = idx;
             idx += read_til_end_bracket(expr.substr(cursor), parsed);
+            res.push_back(parsed);
+        }
+        else if (expr[idx] == '\"') {
+            std::string parsed = "";
+            int cursor = idx;
+            idx += read_til_end_quote(expr.substr(cursor), parsed);
             res.push_back(parsed);
         }
         else if (expr[idx] == '\'' && expr[idx+1] == '(') {
@@ -346,8 +384,11 @@ Expr *make_proc_call(std::vector<std::string> tokens, Env *env) {
  * @returns Pointer to root AST node
  */
 Expr *build_AST(std::string expr, Env *env) {
+    size_t open_brack = expr.find('(');
+    size_t close_brack = expr.find_last_of(')');
+
     /* number - string - literal - symbol expression */
-    if (expr[0] != '(' && expr[expr.size()-1] != ')') 
+    if (open_brack == std::string::npos || close_brack == std::string::npos)
         return make_const(expr, env);
     
     /* list expression */
