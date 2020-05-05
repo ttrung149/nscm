@@ -49,6 +49,11 @@ private:
         std::tuple<Expr*, Expr*, Env*> proc;
     };
 
+    /* Specific type evaluators */
+    Expr eval_sym(std::vector<Expr*> *bindings, Env *e);
+    Expr eval_proc(std::vector<Expr*> *bindings, Env *e);
+    Expr eval_prim(std::vector<Expr*> *bindings, Env *e);
+
 public:
     /* Constructors */
     Expr(int64_t i);
@@ -69,15 +74,11 @@ public:
     ExpType get_expr_type(void);
     PrimType get_prim_type(void);
 
-    /* Evaluators */
-    Expr eval_sym(std::vector<Expr*> *bindings, Env *e);
-    Expr eval_proc(std::vector<Expr*> *bindings, Env *e);
-    Expr eval_prim(std::vector<Expr*> *bindings, Env *e);
+    /* Generic evaluator dispatcher */
     Expr eval(std::vector<Expr*> *bindings, Env *e);
 
     /* IO */
     void print_to_console(void);
-    void free_expr(void);
 };
 
 #endif

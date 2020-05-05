@@ -410,7 +410,7 @@ Expr Expr::eval_prim(std::vector<Expr*> *bindings, Env *e) {
         /*======================= List operations =========================*/
         /* car */
         case PrimType::CAR: {
-            if (args.size() != 1) throw "Invalid num args for 'string?'";
+            if (args.size() != 1) throw "Invalid num args for 'car'";
             Expr e1 = args[0]->eval(bindings, e);
             if (e1.type == ExpType::LIST) {
                 std::vector<Expr*> l = *e1.list;
@@ -419,6 +419,101 @@ Expr Expr::eval_prim(std::vector<Expr*> *bindings, Env *e) {
             }
             else throw "Argument for 'car' is not list type"; ;
         }
+        /* cdr */
+        case PrimType::CDR: {
+            if (args.size() != 1) throw "Invalid num args for 'cdr'";
+            Expr e1 = args[0]->eval(bindings, e);
+            if (e1.type == ExpType::LIST) {
+                std::vector<Expr*> l = *e1.list;
+                if (l.size() < 2) return Expr(LitType::NIL);
+                else {
+                    std::vector<Expr*> *res(new std::vector<Expr*>());
+                    for (size_t i = 1; i < l.size(); i++)
+                        res->push_back(l[i]);
+                    return Expr(res);
+                }
+            }
+            else throw "Argument for 'cdr' is not list type"; ;
+        }
+        /* cons */
+        case PrimType::CONS: {
+            if (args.size() != 2) throw "Invalid num args for 'cons'";
+            Expr e1 = args[0]->eval(bindings, e);
+            Expr e2 = args[1]->eval(bindings, e);
+            if (e1.type != ExpType::LIST && e2.type == ExpType::LIST) {
+                std::vector<Expr*> *l(new std::vector<Expr*>(*e2.list));
+                Expr *new_val = new Expr(e1);
+                l->insert(l->begin(), new_val);
+                return Expr(l);
+            }
+            else throw "Invalid arguments type for 'cons'"; ;
+        }
+        /* append */
+        case PrimType::APPEND: {
+            if (args.size() != 2) throw "Invalid num args for 'append'";
+            Expr e1 = args[0]->eval(bindings, e);
+            Expr e2 = args[1]->eval(bindings, e);
+            if (e1.type == ExpType::LIST && e2.type == ExpType::LIST) {
+                std::vector<Expr*> *l(new std::vector<Expr*>(*e1.list));
+                for (auto &elem : *e2.list) {
+                    Expr *new_val(new Expr(*elem));
+                    l->push_back(new_val);
+                }
+                return Expr(l);
+            }
+            else throw "Invalid arguments type for 'append'"; ;
+        }
+        /* map */
+        case PrimType::MAP: {
+            if (args.size() != 2) throw "Invalid num args for 'map'";
+            Expr fun = args[0]->eval(bindings, e);
+            Expr iter = args[1]->eval(bindings, e);
+            if (fun.type == ExpType::PROC && iter.type == ExpType::LIST) {
+                std::vector<Expr*> *l(new std::vector<Expr*>());
+                for (auto &elem : *iter.list) {
+                    std::vector<Expr*> args = {};
+                    Expr *arg_binding(new Expr(*elem));
+                    args.push_back(arg_binding);
+                    
+                    Expr *applied_elem(new Expr(fun.eval(&args, e)));
+                    l->push_back(applied_elem);
+                }
+                return Expr(l);
+            }
+            else throw "Invalid arguments type for 'map'"; ;
+        }
+        /* filter */
+        case PrimType::FILTER: {
+            if (args.size() != 2) throw "Invalid num args for 'filter'";
+            Expr fun = args[0]->eval(bindings, e);
+            Expr iter = args[1]->eval(bindings, e);
+            if (fun.type == ExpType::PROC && iter.type == ExpType::LIST) {
+                std::vector<Expr*> *l(new std::vector<Expr*>());
+                for (auto &elem : *iter.list) {
+                    std::vector<Expr*> args { elem };
+                    Expr applied_elem = Expr(fun.eval(&args, e));
+                    if (applied_elem.get_expr_type() == ExpType::LIT) {
+                        if (applied_elem.lit == LitType::TRUE)
+                            l->push_back(new Expr(*elem));
+                    }
+                    else { throw "Decider function does not return lit type"; }
+                }
+                return Expr(l);
+            }
+            else throw "Invalid arguments type for 'filter'"; ;
+        }
+        /* null? */
+        case PrimType::IS_NULL: {
+            if (args.size() != 1) throw "Invalid num args for 'null?'";
+            Expr e1 = args[0]->eval(bindings, e);
+            if (e1.type == ExpType::LIST) {
+                std::vector<Expr*> l = *e1.list;
+                if (l.size() == 0) return Expr(LitType::TRUE);
+                else return Expr(LitType::FALSE);
+            }
+            else throw "Invalid argument type for 'null?'"; ;
+        }
+
         /*======================= Invalid primative =======================*/
         default: throw "Invalid primitive";
     }
