@@ -14,12 +14,18 @@
 #include "parser.h"
 
 void terminate(int signum) {
+    std::cout << "\nExiting..\n";
     exit(signum);
 }
 
 /*============================================================================
  *  REPL implementation
  *===========================================================================*/
+/**
+ * Read-eval-print loop. Prints the result of the expression to stdout.
+ * @param in Input stream
+ * @returns void
+ */
 void repl(std::istream &in) {
     std::unordered_map<std::string, Expr*> std_env_frame {};
     Env global_env(std_env_frame);
@@ -39,15 +45,9 @@ void repl(std::istream &in) {
                 expr->print_to_console();
             std::cout << "\n";
         }
-        catch (const char* e) {
-            std::cerr << "ERR: " << e << "\n";
-        }
-        catch (const std::string &e) {
-            std::cerr << "ERR: " << e << "\n";
-        }
-        catch (...) {
-            std::cerr << "Unexpected error\n";
-        }
+        catch (const char* e)         { std::cerr << "ERR: " << e << "\n"; }
+        catch (const std::string &e)  { std::cerr << "ERR: " << e << "\n"; }
+        // catch (...)                   { std::cerr << "Unexpected error\n"; }
     }
 }
 

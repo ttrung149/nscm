@@ -25,11 +25,13 @@
 
 enum class ExpType { LIT, INT, FLOAT, STRING, LIST, SYMBOL, PROC, PRIM };
 enum class PrimType { 
-    IF, WHILE, DEFINE, SET,                         // Control flow, var assign
+    IF, DEFINE, SET,                                // Control flow, var assign
     ADD, SUB, MUL, DIV, MOD, GT, LT, GE, LE,        // Arithmetic operations
-    IS_NUM, IS_SYM, IS_PROC, IS_LIST,               // Type check
+    SIN, COS, TAN, SQRT, LOG, MAX, MIN, ABS,        // Math operations
+    IS_NUM, IS_SYM, IS_PROC, IS_LIST, IS_STR,       // Type check
+    IS_BOOL,
     LAMBDA,                                         // Lambda expression
-    CAR, CDR, CONS                                  // List comprehension
+    CAR, CDR, CONS, IS_NULL, MAP, FILTER, APPEND    // List operations
 };
 enum class LitType { TRUE, FALSE, NIL };
 

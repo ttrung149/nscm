@@ -174,8 +174,7 @@ Expr Expr::eval_prim(std::vector<Expr*> *bindings, Env *e) {
             Expr name = args[0]->eval(bindings, e);
             
             if (name.type == ExpType::STRING) {
-                Expr *old_val = e->find_var_in_frame(name.sval);
-                if (old_val == nullptr) 
+                if (!e->is_in_env(name.sval)) 
                     throw "Unbounded variable '" + name.sval + "'";
                 
                 // Re-bind variable name to a new expression in env
@@ -202,17 +201,6 @@ Expr Expr::eval_prim(std::vector<Expr*> *bindings, Env *e) {
             if (cond.type == ExpType::FLOAT && cond.fval > 0.0)
                 return args[1]->eval(bindings, e);
             return args[2]->eval(bindings, e);
-        }
-        /* While statement */
-        case PrimType::WHILE: {
-            if (args.size() != 2) throw "Invalid num args for 'while'";
-            Expr cond = args[0]->eval(bindings, e);
-            if (cond.type != ExpType::LIT) throw "Condition not lit type!";
-
-            while (args[0]->eval(bindings, e).lit == LitType::TRUE)
-                args[1]->eval(bindings, e);
-            
-            return nullptr;
         }
         /*======================= Arith operations =======================*/
         /* Integer addition */
@@ -292,7 +280,7 @@ Expr Expr::eval_prim(std::vector<Expr*> *bindings, Env *e) {
         /*======================= Comparators =============================*/
         /* Greater than */
         case PrimType::GT: {
-            if (args.size() != 2) throw "Invalid num args for 'modulo'";
+            if (args.size() != 2) throw "Invalid num args for '>'";
             Expr e1 = args[0]->eval(bindings, e);
             Expr e2 = args[1]->eval(bindings, e);
 
@@ -308,11 +296,11 @@ Expr Expr::eval_prim(std::vector<Expr*> *bindings, Env *e) {
             else if (e1.type == ExpType::FLOAT && e2.type == ExpType::FLOAT)
                 if (e1.fval > e2.fval) return Expr(LitType::TRUE);
                 else return Expr(LitType::FALSE);
-            else throw "Invalid args type for 'modulo'";
+            else throw "Invalid args type for '>'";
         }
         /* Less than */
         case PrimType::LT: {
-            if (args.size() != 2) throw "Invalid num args for 'modulo'";
+            if (args.size() != 2) throw "Invalid num args for '<'";
             Expr e1 = args[0]->eval(bindings, e);
             Expr e2 = args[1]->eval(bindings, e);
 
@@ -328,11 +316,109 @@ Expr Expr::eval_prim(std::vector<Expr*> *bindings, Env *e) {
             else if (e1.type == ExpType::FLOAT && e2.type == ExpType::FLOAT)
                 if (e1.fval < e2.fval) return Expr(LitType::TRUE);
                 else return Expr(LitType::FALSE);
-            else throw "Invalid args type for 'modulo'";
+            else throw "Invalid args type for '<'";
         }
+        /* Greater or equal than */
+        case PrimType::GE: {
+            if (args.size() != 2) throw "Invalid num args for '>='";
+            Expr e1 = args[0]->eval(bindings, e);
+            Expr e2 = args[1]->eval(bindings, e);
 
+            if (e1.type == ExpType::INT && e2.type == ExpType::INT)
+                if (e1.ival >= e2.ival) return Expr(LitType::TRUE);
+                else return Expr(LitType::FALSE);
+            else if (e1.type == ExpType::FLOAT && e2.type == ExpType::INT)
+                if (e1.fval >= e2.ival) return Expr(LitType::TRUE);
+                else return Expr(LitType::FALSE);
+            else if (e1.type == ExpType::INT && e2.type == ExpType::FLOAT)
+                if (e1.ival >= e2.fval) return Expr(LitType::TRUE);
+                else return Expr(LitType::FALSE);
+            else if (e1.type == ExpType::FLOAT && e2.type == ExpType::FLOAT)
+                if (e1.fval >= e2.fval) return Expr(LitType::TRUE);
+                else return Expr(LitType::FALSE);
+            else throw "Invalid args type for '>='";
+        }
+        /* Less or equal than */
+        case PrimType::LE: {
+            if (args.size() != 2) throw "Invalid num args for '<='";
+            Expr e1 = args[0]->eval(bindings, e);
+            Expr e2 = args[1]->eval(bindings, e);
+
+            if (e1.type == ExpType::INT && e2.type == ExpType::INT)
+                if (e1.ival <= e2.ival) return Expr(LitType::TRUE);
+                else return Expr(LitType::FALSE);
+            else if (e1.type == ExpType::FLOAT && e2.type == ExpType::INT)
+                if (e1.fval <= e2.ival) return Expr(LitType::TRUE);
+                else return Expr(LitType::FALSE);
+            else if (e1.type == ExpType::INT && e2.type == ExpType::FLOAT)
+                if (e1.ival <= e2.fval) return Expr(LitType::TRUE);
+                else return Expr(LitType::FALSE);
+            else if (e1.type == ExpType::FLOAT && e2.type == ExpType::FLOAT)
+                if (e1.fval <= e2.fval) return Expr(LitType::TRUE);
+                else return Expr(LitType::FALSE);
+            else throw "Invalid args type for '<='";
+        }
         /*======================= Type checking ===========================*/
-
+        /* number? */
+        case PrimType::IS_NUM: {
+            if (args.size() != 1) throw "Invalid num args for 'number?'";
+            Expr e1 = args[0]->eval(bindings, e);
+            if (e1.type == ExpType::INT || e1.type == ExpType::FLOAT)
+                return Expr(LitType::TRUE);
+            else return Expr(LitType::FALSE);
+        }
+        /* symbol? */
+        case PrimType::IS_SYM: {
+            if (args.size() != 1) throw "Invalid num args for 'symbol?'";
+            Expr e1 = args[0]->eval(bindings, e);
+            if (e1.type == ExpType::SYMBOL)
+                return Expr(LitType::TRUE);
+            else return Expr(LitType::FALSE);
+        }
+        /* list? */
+        case PrimType::IS_LIST: {
+            if (args.size() != 1) throw "Invalid num args for 'list?'";
+            Expr e1 = args[0]->eval(bindings, e);
+            if (e1.type == ExpType::LIST)
+                return Expr(LitType::TRUE);
+            else return Expr(LitType::FALSE);
+        }
+        /* procedure? */
+        case PrimType::IS_PROC: {
+            if (args.size() != 1) throw "Invalid num args for 'procedure?'";
+            Expr e1 = args[0]->eval(bindings, e);
+            if (e1.type == ExpType::PROC)
+                return Expr(LitType::TRUE);
+            else return Expr(LitType::FALSE);
+        }
+        /* boolean? */
+        case PrimType::IS_BOOL: {
+            if (args.size() != 1) throw "Invalid num args for 'boolean?'";
+            Expr e1 = args[0]->eval(bindings, e);
+            if (e1.type == ExpType::LIT)
+                return Expr(LitType::TRUE);
+            else return Expr(LitType::FALSE);
+        }
+        /* string? */
+        case PrimType::IS_STR: {
+            if (args.size() != 1) throw "Invalid num args for 'string?'";
+            Expr e1 = args[0]->eval(bindings, e);
+            if (e1.type == ExpType::STRING)
+                return Expr(LitType::TRUE);
+            else return Expr(LitType::FALSE);
+        }
+        /*======================= List operations =========================*/
+        /* car */
+        case PrimType::CAR: {
+            if (args.size() != 1) throw "Invalid num args for 'string?'";
+            Expr e1 = args[0]->eval(bindings, e);
+            if (e1.type == ExpType::LIST) {
+                std::vector<Expr*> l = *e1.list;
+                if (l.size() == 0) return Expr(LitType::NIL);
+                else return Expr(l[0]->eval(bindings, e)); 
+            }
+            else throw "Argument for 'car' is not list type"; ;
+        }
         /*======================= Invalid primative =======================*/
         default: throw "Invalid primitive";
     }

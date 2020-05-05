@@ -11,16 +11,22 @@
 /* Parsing table */
 const std::unordered_map<std::string, PrimType> token_table {
     { "+"       , PrimType::ADD    },  { "-"         , PrimType::SUB     },
-    { "*"       , PrimType::MUL    },
+    { "*"       , PrimType::MUL    },  { "if"        , PrimType::IF      },
     { "/"       , PrimType::DIV    },  { ">"         , PrimType::GT      },
     { "<"       , PrimType::LT     },  { "mod"       , PrimType::MOD     },
     { ">="      , PrimType::GE     },  { "<="        , PrimType::LE      },
     { "car"     , PrimType::CAR    },  { "cdr"       , PrimType::CDR     }, 
-    { "CONS"    , PrimType::CONS   },  { "lambda"    , PrimType::LAMBDA  },
-    { "define"  , PrimType::DEFINE },  { "set"       , PrimType::SET     },
+    { "cons"    , PrimType::CONS   },  { "lambda"    , PrimType::LAMBDA  },
+    { "define"  , PrimType::DEFINE },  { "set!"      , PrimType::SET     },
     { "number?" , PrimType::IS_NUM },  { "procedure?", PrimType::IS_PROC },
+    { "boolean?", PrimType::IS_BOOL},  { "string?"   , PrimType::IS_STR  },
     { "symbol?" , PrimType::IS_SYM },  { "list?"     , PrimType::IS_LIST },
-    { "if"      , PrimType::IF     },  { "while"     , PrimType::WHILE   }
+    { "null?"   , PrimType::IS_NULL},  { "map"       , PrimType::MAP     }, 
+    { "filter"  , PrimType::FILTER },  { "append"    , PrimType::APPEND  },
+    { "sin"     , PrimType::SIN    },  { "cos"       , PrimType::COS     },
+    { "tan"     , PrimType::TAN    },  { "sqrt"      , PrimType::SQRT    },
+    { "log"     , PrimType::LOG    },  { "max"       , PrimType::MAX     },
+    { "min"     , PrimType::MIN    },  { "abs"       , PrimType::ABS     },
 };
 
 /**
@@ -275,7 +281,7 @@ static Expr *make_prim(std::vector<std::string> &tokens, Env *env) {
         throw "Undefined primitive type: '" + prim_type->first + "'";
 
     /* var define and assignment */
-    if (prim_type->first == "define" || prim_type->first == "set")
+    if (prim_type->first == "define" || prim_type->first == "set!")
         return make_var_assignment(prim_type->second, tokens, env);
     
     /* lambda function */
