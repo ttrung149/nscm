@@ -175,7 +175,7 @@ std::vector<std::string> parse_expr(std::string expr) {
             res.push_back("\'" + parsed);
         }
         else if (expr[idx] == ';') {
-            while (expr[idx] != '\n') idx++;
+            while (idx < close_brack && expr[idx] != '\n') idx++;
         }
         else if (expr[idx] == ' ' || expr[idx] == '\n') {
             idx++;
