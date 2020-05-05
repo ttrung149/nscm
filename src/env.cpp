@@ -1,4 +1,4 @@
- /*============================================================================
+/*============================================================================
  *  nanoscheme
  *  Copyright (c) 2019-2020 - Trung Truong
  *
@@ -44,8 +44,3 @@ Expr* Env::find_var(std::string name) {
     }
     else return nullptr;
 };
-
-Expr* Env::find_var_in_frame(std::string name) {
-    const auto itr = frame.find(name);
-    if (itr != frame.end()) return itr->second; else return nullptr;
-}
