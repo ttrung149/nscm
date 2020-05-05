@@ -9,6 +9,7 @@
  * 
  *==========================================================================*/
 #include <csignal>
+#include <cstring>
 #include "env.h"
 #include "expr.h"
 #include "parser.h"
