@@ -16,6 +16,7 @@ const std::unordered_map<std::string, PrimType> token_table {
     { "<"       , PrimType::LT     },  { "mod"       , PrimType::MOD     },
     { ">="      , PrimType::GE     },  { "<="        , PrimType::LE      },
     { "car"     , PrimType::CAR    },  { "cdr"       , PrimType::CDR     }, 
+    { "equal?"  , PrimType::EQ     },  { "="         , PrimType::EQ_NUM  },
     { "cons"    , PrimType::CONS   },  { "lambda"    , PrimType::LAMBDA  },
     { "define"  , PrimType::DEFINE },  { "set!"      , PrimType::SET     },
     { "number?" , PrimType::IS_NUM },  { "procedure?", PrimType::IS_PROC },
@@ -25,8 +26,7 @@ const std::unordered_map<std::string, PrimType> token_table {
     { "filter"  , PrimType::FILTER },  { "append"    , PrimType::APPEND  },
     { "sin"     , PrimType::SIN    },  { "cos"       , PrimType::COS     },
     { "tan"     , PrimType::TAN    },  { "sqrt"      , PrimType::SQRT    },
-    { "log"     , PrimType::LOG    },  { "max"       , PrimType::MAX     },
-    { "min"     , PrimType::MIN    },  { "abs"       , PrimType::ABS     },
+    { "log"     , PrimType::LOG    },  { "abs"       , PrimType::ABS     }
 };
 
 /**

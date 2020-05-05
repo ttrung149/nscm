@@ -26,8 +26,8 @@
 enum class ExpType { LIT, INT, FLOAT, STRING, LIST, SYMBOL, PROC, PRIM };
 enum class PrimType { 
     IF, DEFINE, SET,                                // Control flow, var assign
-    ADD, SUB, MUL, DIV, MOD, GT, LT, GE, LE,        // Arithmetic operations
-    SIN, COS, TAN, SQRT, LOG, MAX, MIN, ABS,        // Math operations
+    ADD, SUB, MUL, DIV, MOD, GT, LT, GE, LE, EQ,    // Arithmetic operations
+    EQ_NUM, SIN, COS, TAN, SQRT, LOG, ABS,          // Math operations
     IS_NUM, IS_SYM, IS_PROC, IS_LIST, IS_STR,       // Type check
     IS_BOOL,
     LAMBDA,                                         // Lambda expression

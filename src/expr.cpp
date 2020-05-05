@@ -277,7 +277,108 @@ Expr Expr::eval_prim(std::vector<Expr*> *bindings, Env *e) {
                 return Expr(e1.ival % e2.ival);
             else throw "Invalid args type for 'modulo'";
         }
+        /*======================= Math operations =========================*/
+        case PrimType::SIN: {
+            if (args.size() != 1) throw "Invalid num args for 'sin'";
+            Expr e1 = args[0]->eval(bindings, e);
+            if (e1.type == ExpType::INT) 
+                return Expr(sin(e1.ival));
+            else if (e1.type == ExpType::FLOAT)
+                return Expr(sin(e1.fval));
+            else throw "Invalid args type for 'sin'";
+        }
+        case PrimType::COS: {
+            if (args.size() != 1) throw "Invalid num args for 'cos'";
+            Expr e1 = args[0]->eval(bindings, e);
+            if (e1.type == ExpType::INT) 
+                return Expr(cos(e1.ival));
+            else if (e1.type == ExpType::FLOAT)
+                return Expr(cos(e1.fval));
+            else throw "Invalid args type for 'cos'";
+        }
+        case PrimType::TAN: {
+            if (args.size() != 1) throw "Invalid num args for 'tan'";
+            Expr e1 = args[0]->eval(bindings, e);
+            if (e1.type == ExpType::INT) 
+                return Expr(tan(e1.ival));
+            else if (e1.type == ExpType::FLOAT)
+                return Expr(tan(e1.fval));
+            else throw "Invalid args type for 'tan'";
+        }
+        case PrimType::SQRT: {
+            if (args.size() != 1) throw "Invalid num args for 'sqrt'";
+            Expr e1 = args[0]->eval(bindings, e);
+            if (e1.type == ExpType::INT) 
+                return Expr(sqrt(e1.ival));
+            else if (e1.type == ExpType::FLOAT)
+                return Expr(sqrt(e1.fval));
+            else throw "Invalid args type for 'sqrt'";
+        }
+        case PrimType::LOG: {
+            if (args.size() != 1) throw "Invalid num args for 'log'";
+            Expr e1 = args[0]->eval(bindings, e);
+            if (e1.type == ExpType::INT) 
+                return Expr(log(e1.ival));
+            else if (e1.type == ExpType::FLOAT)
+                return Expr(log(e1.fval));
+            else throw "Invalid args type for 'log'";
+        }
+        case PrimType::ABS: {
+            if (args.size() != 1) throw "Invalid num args for 'abs'";
+            Expr e1 = args[0]->eval(bindings, e);
+            if (e1.type == ExpType::INT) 
+                return Expr(abs(e1.ival));
+            else if (e1.type == ExpType::FLOAT)
+                return Expr(abs(e1.fval));
+            else throw "Invalid args type for 'abs'";
+        }
         /*======================= Comparators =============================*/
+        /* equal? */
+        case PrimType::EQ: {
+            if (args.size() != 2) throw "Invalid num args for 'equal?'";
+            Expr e1 = args[0]->eval(bindings, e);
+            Expr e2 = args[1]->eval(bindings, e);
+
+            if (e1.type == ExpType::INT && e2.type == ExpType::INT)
+                if (e1.ival == e2.ival) return Expr(LitType::TRUE);
+                else return Expr(LitType::FALSE);
+            else if (e1.type == ExpType::FLOAT && e2.type == ExpType::INT)
+                if (e1.fval == e2.ival) return Expr(LitType::TRUE);
+                else return Expr(LitType::FALSE);
+            else if (e1.type == ExpType::INT && e2.type == ExpType::FLOAT)
+                if (e1.ival == e2.fval) return Expr(LitType::TRUE);
+                else return Expr(LitType::FALSE);
+            else if (e1.type == ExpType::FLOAT && e2.type == ExpType::FLOAT)
+                if (e1.fval == e2.fval) return Expr(LitType::TRUE);
+                else return Expr(LitType::FALSE);
+            else if (e1.type == ExpType::STRING && e2.type == ExpType::STRING)
+                if (e1.sval == e2.sval) return Expr(LitType::TRUE);
+                else return Expr(LitType::FALSE);
+            else if (e1.type == ExpType::LIT && e2.type == ExpType::LIT)
+                if (e1.sval == e2.sval) return Expr(LitType::TRUE);
+                else return Expr(LitType::FALSE);
+            else throw "Invalid args type for 'equal?'";
+        }
+        /* Equal (number) */
+        case PrimType::EQ_NUM: {
+            if (args.size() != 2) throw "Invalid num args for '='";
+            Expr e1 = args[0]->eval(bindings, e);
+            Expr e2 = args[1]->eval(bindings, e);
+
+            if (e1.type == ExpType::INT && e2.type == ExpType::INT)
+                if (e1.ival == e2.ival) return Expr(LitType::TRUE);
+                else return Expr(LitType::FALSE);
+            else if (e1.type == ExpType::FLOAT && e2.type == ExpType::INT)
+                if (e1.fval == e2.ival) return Expr(LitType::TRUE);
+                else return Expr(LitType::FALSE);
+            else if (e1.type == ExpType::INT && e2.type == ExpType::FLOAT)
+                if (e1.ival == e2.fval) return Expr(LitType::TRUE);
+                else return Expr(LitType::FALSE);
+            else if (e1.type == ExpType::FLOAT && e2.type == ExpType::FLOAT)
+                if (e1.fval == e2.fval) return Expr(LitType::TRUE);
+                else return Expr(LitType::FALSE);
+            else throw "Invalid args type for '='";
+        }
         /* Greater than */
         case PrimType::GT: {
             if (args.size() != 2) throw "Invalid num args for '>'";
