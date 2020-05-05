@@ -10,22 +10,22 @@
 
  /* Constructors */
 Env::Env(std::unordered_map<std::string, Expr*> &f)
-    :frame(f), tail(nullptr) {};
+    :frame(f), tail(nullptr) {}
 Env::Env(std::unordered_map<std::string, Expr*> &f, Env *tl)
-    :frame(f), tail(tl) {};
-Env::Env(Env *tl) { frame = {}; tail = tl; };
+    :frame(f), tail(tl) {}
+Env::Env(Env *tl) { frame = {}; tail = tl; }
 
 /* Destructor */
-Env::~Env() {};
+Env::~Env() {}
 
 /* Env state modifiers  */
 Env *Env::get_tl() { 
     return tail; 
-};
+}
 
 void Env::add_key_value_pair(std::string &k, Expr *v) {
     frame[k] = v;
-};
+}
 
 bool Env::is_in_env(std::string name) {
     const auto itr = frame.find(name);
@@ -43,4 +43,4 @@ Expr* Env::find_var(std::string name) {
         return this->tail->find_var(name);
     }
     else return nullptr;
-};
+}

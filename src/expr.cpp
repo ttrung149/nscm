@@ -618,7 +618,7 @@ Expr Expr::eval_prim(std::vector<Expr*> *bindings, Env *e) {
         /*======================= Invalid primative =======================*/
         default: throw "Invalid primitive";
     }
-};
+}
 
 /**
  * Evaluate generic expression. Delegate evaluation to data-type specific 
@@ -639,7 +639,7 @@ Expr Expr::eval(std::vector<Expr*> *bindings, Env *e) {
         case ExpType::PROC:     return eval_proc(bindings, e);
         default:                throw "Eval failed: Unknown token type";
     }
-};
+}
 
 /*============================================================================
  *  IOs
